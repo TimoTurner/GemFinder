@@ -954,7 +954,7 @@ def show_discogs_and_revibed_block(releases, track_for_search, revibed_results):
         title_str = r.get("title", "-")
         url = r.get("uri") or r.get("url") or ""
 
-        cols = st.columns([1, 5])
+        cols = st.columns([1, 5]) #hallo
         with cols[0]:
             st.image(cover_url, width=92)
         with cols[1]:

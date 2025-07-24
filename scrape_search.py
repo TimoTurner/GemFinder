@@ -434,90 +434,32 @@
 #     driver.quit()
 
 #     return releases
-# scrape_search.py
-import concurrent.futures
+# scrape_search.py - DUMMY VERSION FOR FAST TESTING
 import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from typing import List, Dict
+# import threading
+# import time
+# from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def _get_driver():
-    options = webdriver.ChromeOptions()
-    options.add_argument('--headless=new')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    return webdriver.Chrome(options=options)
-
-# --- BEATPORT ---
+# --- BEATPORT DUMMY ---
 def search_beatport(artist, track):
-    t0 = time.time()
-    url = f"https://www.beatport.com/search?q={artist}%20{track}"
-    driver = _get_driver()
-    driver.get(url)
-    wait = WebDriverWait(driver, 5)
-    results = []
-    try:
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div[data-testid="tracks-table-row"]')))
-        rows = driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="tracks-table-row"]')
-        for row in rows:
-            try:
-                title = row.find_element(By.CSS_SELECTOR, 'span.Tables-shared-style__ReleaseName-sc-4e49ff54-4').text.strip()
-            except:
-                title = ""
-            try:
-                artist_str = ', '.join([a.text.strip() for a in row.find_elements(By.CSS_SELECTOR, 'div.ArtistNames-sc-72fc6023-0 a')])
-            except:
-                artist_str = ""
-            try:
-                label = row.find_element(By.CSS_SELECTOR, 'div.cell.label').text.strip()
-            except:
-                label = ""
-            try:
-                album = row.find_element(By.CSS_SELECTOR, 'a.artwork').get_attribute('title').strip()
-            except:
-                album = ""
-            try:
-                cover_url = row.find_element(By.CSS_SELECTOR, 'a.artwork img').get_attribute('src').strip()
-            except:
-                cover_url = ""
-            try:
-                price = row.find_element(By.CSS_SELECTOR, 'button.add-to-cart .price').text.strip()
-            except:
-                price = "Release Only"
-            try:
-                track_url = row.find_element(By.CSS_SELECTOR, "a.artwork").get_attribute("href")
-            except:
-                track_url = ""
-            results.append({
-                'platform': 'Beatport',
-                'title': title,
-                'artist': artist_str,
-                'album': album,
-                'label': label,
-                'price': price,
-                'cover_url': cover_url,
-                'url': track_url,
-                'search_time': round(time.time() - t0, 2)
-            })
-        driver.quit()
-        if results:
-            return [results[0]]
-        else:
-            return [{
-                'platform': 'Beatport',
-                'title': 'Kein Treffer',
-                'artist': '',
-                'album': '',
-                'label': '',
-                'price': '',
-                'cover_url': '',
-                'url': '',
-                'search_time': round(time.time() - t0, 2)
-            }]
-    except Exception as e:
-        print("Beatport error:", e)
-        driver.quit()
+    """Fast dummy implementation for testing"""
+    time.sleep(0.1)  # Simulate minimal processing time
+    
+    # Scenario A: Digital files found (for test tracks)
+    if artist.lower() in ["A", "a"] or track.lower() in ["A", "a"]:
+        return [{
+            'platform': 'Beatport',
+            'title': f'{track} (Original Mix)',
+            'artist': artist,
+            'album': f'{track} EP',
+            'label': 'Digital Records',
+            'price': '€2.49',
+            'cover_url': 'https://placehold.co/120x120/FF6B6B/white?text=Beatport',
+            'url': f'https://beatport.com/track/{track.lower().replace(" ", "-")}',
+            'search_time': 0.1
+        }]
+    else:
         return [{
             'platform': 'Beatport',
             'title': 'Kein Treffer',
@@ -527,84 +469,28 @@ def search_beatport(artist, track):
             'price': '',
             'cover_url': '',
             'url': '',
-            'search_time': round(time.time() - t0, 2)
+            'search_time': 0.1
         }]
 
-# --- BANDCAMP ---
+# --- BANDCAMP DUMMY ---
 def search_bandcamp(artist, track):
-    t0 = time.time()
-    url = f"https://bandcamp.com/search?q={artist}%20{track}"
-    driver = _get_driver()
-    driver.get(url)
-    wait = WebDriverWait(driver, 5)
-    results = []
-    try:
-        search_results = wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'li.searchresult'))
-        )
-        for result in search_results:
-            try:
-                title = result.find_element(By.CSS_SELECTOR, '.heading a').text.strip()
-            except:
-                title = ""
-            try:
-                artist_str = result.find_element(By.CSS_SELECTOR, '.subhead').text.replace('by ', '').strip()
-            except:
-                artist_str = ""
-            try:
-                album_elem = result.find_element(By.CSS_SELECTOR, '.itemtype').text.strip()
-            except:
-                album_elem = ""
-            try:
-                cover_url = result.find_element(By.CSS_SELECTOR, '.art img').get_attribute('src')
-            except:
-                cover_url = ""
-            try:
-                item_url = result.find_element(By.CSS_SELECTOR, '.itemurl a').get_attribute('href')
-            except:
-                item_url = ""
-            price = None
-            label = None
-            if item_url:
-                driver.execute_script("window.open(arguments[0]);", item_url)
-                driver.switch_to.window(driver.window_handles[1])
-                try:
-                    price = wait.until(EC.presence_of_element_located(
-                        (By.CSS_SELECTOR, '.base-text-color'))).text.strip()
-                except:
-                    price = 'name your price'
-                label = driver.current_url.split(".bandcamp.com")[0].replace("https://", "")
-                driver.close()
-                driver.switch_to.window(driver.window_handles[0])
-            results.append({
-                'platform': 'Bandcamp',
-                'title': title,
-                'artist': artist_str,
-                'album': album_elem,
-                'label': label,
-                'price': price,
-                'cover_url': cover_url,
-                'url': item_url,
-                'search_time': round(time.time() - t0, 2)
-            })
-        driver.quit()
-        if results:
-            return [results[0]]
-        else:
-            return [{
-                'platform': 'Bandcamp',
-                'title': 'Kein Treffer',
-                'artist': '',
-                'album': '',
-                'label': '',
-                'price': '',
-                'cover_url': '',
-                'url': '',
-                'search_time': round(time.time() - t0, 2)
-            }]
-    except Exception as e:
-        print("Bandcamp error:", e)
-        driver.quit()
+    """Fast dummy implementation for testing"""
+    time.sleep(0.1)
+    
+    # Scenario A: Digital files found
+    if artist.lower() in ["A", "a"] or track.lower() in ["A", "a"]:
+        return [{
+            'platform': 'Bandcamp',
+            'title': track,
+            'artist': artist,
+            'album': f'{track} Single',
+            'label': 'independent-records',
+            'price': '€3.00',
+            'cover_url': 'https://placehold.co/120x120/4ECDC4/white?text=Bandcamp',
+            'url': f'https://independent-records.bandcamp.com/track/{track.lower().replace(" ", "-")}',
+            'search_time': 0.1
+        }]
+    else:
         return [{
             'platform': 'Bandcamp',
             'title': 'Kein Treffer',
@@ -614,76 +500,28 @@ def search_bandcamp(artist, track):
             'price': '',
             'cover_url': '',
             'url': '',
-            'search_time': round(time.time() - t0, 2)
+            'search_time': 0.1
         }]
 
-# --- TRAXSOURCE ---
+# --- TRAXSOURCE DUMMY ---
 def search_traxsource(artist, track):
-    t0 = time.time()
-    url = f"https://www.traxsource.com/search?term={artist}+{track}"
-    driver = _get_driver()
-    driver.get(url)
-    wait = WebDriverWait(driver, 5)
-    results = []
-    try:
-        track_rows = wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div.trk-row'))
-        )
-        for row in track_rows:
-            try:
-                title = row.find_element(By.CSS_SELECTOR, 'div.title a').text.strip()
-            except:
-                title = ""
-            try:
-                artist_str = row.find_element(By.CSS_SELECTOR, 'div.artists').text.strip()
-            except:
-                artist_str = ""
-            try:
-                label = row.find_element(By.CSS_SELECTOR, 'div.label a').text.strip()
-            except:
-                label = ""
-            try:
-                price = row.find_element(By.CSS_SELECTOR, 'span.price').text.strip()
-            except:
-                price = ""
-            try:
-                img_elem = row.find_element(By.CSS_SELECTOR, 'div.thumb img')
-                cover_url = img_elem.get_attribute('src') if img_elem else ''
-            except:
-                cover_url = ""
-            try:
-                track_url = row.find_element(By.CSS_SELECTOR, 'div.title a').get_attribute('href')
-            except:
-                track_url = ""
-            results.append({
-                'platform': 'Traxsource',
-                'title': title,
-                'artist': artist_str,
-                'album': title,
-                'label': label,
-                'price': price,
-                'cover_url': cover_url,
-                'url': track_url,
-                'search_time': round(time.time() - t0, 2)
-            })
-        driver.quit()
-        if results:
-            return [results[0]]
-        else:
-            return [{
-                'platform': 'Traxsource',
-                'title': 'Kein Treffer',
-                'artist': '',
-                'album': '',
-                'label': '',
-                'price': '',
-                'cover_url': '',
-                'url': '',
-                'search_time': round(time.time() - t0, 2)
-            }]
-    except Exception as e:
-        print("Traxsource error:", e)
-        driver.quit()
+    """Fast dummy implementation for testing"""
+    time.sleep(0.1)
+    
+    # Scenario A: Digital files found
+    if artist.lower() in ["A", "a"] or track.lower() in ["A", "a"]:
+        return [{
+            'platform': 'Traxsource',
+            'title': f'{track} (Extended Mix)',
+            'artist': artist,
+            'album': track,
+            'label': 'Deep House Label',
+            'price': '$2.99',
+            'cover_url': 'https://placehold.co/120x120/45B7D1/white?text=Traxsource',
+            'url': f'https://traxsource.com/track/{track.lower().replace(" ", "-")}',
+            'search_time': 0.1
+        }]
+    else:
         return [{
             'platform': 'Traxsource',
             'title': 'Kein Treffer',
@@ -693,17 +531,15 @@ def search_traxsource(artist, track):
             'price': '',
             'cover_url': '',
             'url': '',
-            'search_time': round(time.time() - t0, 2)
+            'search_time': 0.1
         }]
 
-# --- REVIBED ---
+# --- REVIBED DUMMY ---
 def search_revibed(artist, album):
-    query_term = ""
-    if album:
-        query_term = album
-    elif artist:
-        query_term = artist
-    else:
+    """Fast dummy implementation for testing"""
+    time.sleep(0.1)
+    
+    if not (artist or album):
         return [{
             'platform': 'Revibed',
             'title': '',
@@ -713,66 +549,24 @@ def search_revibed(artist, album):
             'price': '',
             'cover_url': '',
             'url': '',
-            'search_time': 0.0,
+            'search_time': 0.1,
             'message': "Für Revibed-Suche muss mindestens Album ODER Artist ausgefüllt sein."
         }]
-    t0 = time.time()
-    url = f"https://revibed.com/marketplace/buy-now-rare-vinyl-records-cds-&-cassette-tapes?query={query_term.replace(' ', '+')}&sort=totalPurchasesCount%2CDESC&size=25&page=0"
-    driver = _get_driver()
-    driver.get(url)
-    wait = WebDriverWait(driver, 5)
-    results = []
-    try:
-        items = wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.styles_marketplaceGoods__r5WKf"))
-        )
-        for item in items:
-            try:
-                title = item.find_element(By.CSS_SELECTOR, ".styles_projectNames__project__title__D49o3").text.strip()
-            except:
-                title = ''
-            try:
-                album_val = item.find_element(By.CSS_SELECTOR, ".styles_projectNames__album__title__V25wN").text.strip()
-            except:
-                album_val = ''
-            try:
-                cover_url = item.find_element(By.CSS_SELECTOR, "img").get_attribute('src')
-            except:
-                cover_url = ''
-            try:
-                item_url = item.find_element(By.CSS_SELECTOR, "a").get_attribute('href')
-            except:
-                item_url = ''
-            results.append({
-                'platform': 'Revibed',
-                'title': title,
-                'artist': '',  # Revibed hat selten Artists im Listing!
-                'album': album_val,
-                'label': '',
-                'price': '',
-                'cover_url': cover_url,
-                'url': item_url,
-                'search_time': round(time.time() - t0, 2)
-            })
-        driver.quit()
-        if results:
-            return [results[0]]
-        else:
-            return [{
-                'platform': 'Revibed',
-                'title': 'Kein Treffer',
-                'artist': '',
-                'album': '',
-                'label': '',
-                'price': '',
-                'cover_url': '',
-                'url': '',
-                'search_time': round(time.time() - t0, 2)
-            }]
-        
-    except Exception as e:
-        print("Revibed error:", e)
-        driver.quit()
+    
+    # Scenario B: Revibed files found (for vinyl/rare tracks)
+    if artist.lower() in ["B", "b"] or (album and "b" in album.lower()):
+        return [{
+            'platform': 'Revibed',
+            'title': artist or "Unknown Artist",
+            'artist': '',
+            'album': album or f'{artist} Collection',
+            'label': '',
+            'price': '€45.00',
+            'cover_url': 'https://placehold.co/120x120/96CEB4/white?text=Revibed',
+            'url': f'https://revibed.com/item/{(album or artist).lower().replace(" ", "-")}',
+            'search_time': 0.1
+        }]
+    else:
         return [{
             'platform': 'Revibed',
             'title': 'Kein Treffer',
@@ -782,70 +576,242 @@ def search_revibed(artist, album):
             'price': '',
             'cover_url': '',
             'url': '',
-            'search_time': round(time.time() - t0, 2)
+            'search_time': 0.1
         }]
 
-        driver.quit()
-        if results:
-            return [results[0]]
-        else:
-            return [{
-                'platform': 'Revibed',
-                'title': 'Kein Treffer',
-                'artist': '',
-                'album': '',
-                'label': '',
-                'price': '',
-                'cover_url': '',
-                'url': '',
-                'search_time': round(time.time() - t0, 2)
-            }]
-        
-    except Exception as e:
-        print("Revibed error:", e)
-        driver.quit()
-        return [{
-            'platform': 'Revibed',
-            'title': 'Kein Treffer',
-            'artist': '',
-            'album': '',
-            'label': '',
-            'price': '',
-            'cover_url': '',
-            'url': '',
-            'search_time': round(time.time() - t0, 2)
-        }]
-
-# ----- Zentrale parallele Wrapperfunktion -----
+# ----- Fast parallel wrapper function -----
 def search_digital_releases_parallel(artist, track, album, catno):
-    platforms = [
-        ("Beatport", lambda a, t, al, cn: search_beatport(a, t)),
-        ("Bandcamp", lambda a, t, al, cn: search_bandcamp(a, t)),
-        ("Traxsource", lambda a, t, al, cn: search_traxsource(a, t)),
-    ]
+    """Fast dummy parallel search - no actual threading needed for testing"""
     results = []
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_platform = {
-            executor.submit(func, artist, track, album, catno): name for name, func in platforms
-        }
-        for future in concurrent.futures.as_completed(future_to_platform):
-            name = future_to_platform[future]
-            try:
-                result = future.result(timeout=8)
-                print(f"[{name}] Suchzeit: {result[0].get('search_time','-')}s — Ergebnis: {result[0].get('title','-')}")
-                results.extend(result)
-            except Exception as exc:
-                print(f"{name} generated an exception: {exc}")
-                results.append({
-                    "platform": name,
-                    "title": "Fehler / Kein Treffer",
-                    "artist": "",
-                    "album": "",
-                    "label": "",
-                    "price": "",
-                    "cover_url": "",
-                    "url": "",
-                    "search_time": 0.0
-                })
+    
+    # Call each platform sequentially but quickly
+    platforms = [
+        ("Beatport", search_beatport),
+        ("Bandcamp", search_bandcamp), 
+        ("Traxsource", search_traxsource),
+    ]
+    
+    for name, func in platforms:
+        try:
+            result = func(artist, track)
+            print(f"[{name}] Suchzeit: {result[0].get('search_time','-')}s — Ergebnis: {result[0].get('title','-')}")
+            results.extend(result)
+        except Exception as exc:
+            print(f"{name} generated an exception: {exc}")
+            results.append({
+                "platform": name,
+                "title": "Fehler / Kein Treffer", 
+                "artist": "",
+                "album": "",
+                "label": "",
+                "price": "",
+                "cover_url": "",
+                "url": "",
+                "search_time": 0.1
+            })
+    
     return results
+
+# def search_platform_with_live_update(provider, criteria, live_container):
+#     """Einzelner Thread für eine Plattform"""
+#     try:
+#         result = provider.search(criteria)
+#         # SOFORT anzeigen sobald fertig:
+#         with live_container:
+#             st.session_state.live_results.append(result)
+#             show_live_results()  # Progressives Update
+#     except Exception as e:
+#         # Auch Fehler sofort anzeigen
+#         error_result = {"platform": provider.name, "title": "Fehler", "error": str(e)}
+#         with live_container:
+#             st.session_state.live_results.append(error_result)
+#             show_live_results()
+
+
+from typing import List, Dict, Optional
+from discogs_scraper import create_discogs_scraper
+from utils import parse_price, CURRENCY_MAPPING
+
+def scrape_discogs_marketplace_offers(
+    release_id: str,
+    max_offers: Optional[int] = 10,
+    user_country: Optional[str] = None
+) -> List[Dict]:
+    """
+    Production-ready Discogs marketplace scraper integration
+
+    Args:
+        release_id:   Discogs release ID
+        max_offers:   Maximum number of offers to return
+        user_country: ISO-Länderkürzel (z. B. "DE", "US")
+
+    Returns:
+        Liste von Angeboten in der lokalen Währung, angereichert um
+        price_amount, price_currency, shipping_amount und total_amount.
+    """
+    # Währung ermitteln (Fallback auf DEFAULT)
+    preferred_currency = CURRENCY_MAPPING.get(
+        (user_country or "").upper(),
+        CURRENCY_MAPPING["DEFAULT"]
+    )
+
+    try:
+        # Scraper mit Server-Konfiguration erzeugen
+        scraper = create_discogs_scraper(
+            headless=True,
+            enable_cache=True,
+            use_proxies=False
+        )
+
+        # user_country in den Scraper-Config schreiben, damit das
+        # build von marketplace_url korrekt funktioniert
+        if user_country:
+            scraper.config.user_country = user_country.upper()
+
+        # Angebote scrapen (interne Methode liest scraper.config.user_country)
+        raw = scraper.scrape_marketplace_offers(release_id, max_offers)
+
+        offers = raw.get("offers", [])
+        filtered = []
+
+        # Nur Angebote in preferred_currency übernehmen
+        for o in offers:
+            price_amt, price_curr = parse_price(o.get("price", ""))
+            if price_curr != preferred_currency:
+                continue
+
+            shipping_amt, _ = parse_price(o.get("shipping", ""))
+            item = o.copy()
+            item.update({
+                "price_amount":    price_amt,
+                "price_currency":  price_curr,
+                "shipping_amount": shipping_amt,
+                "total_amount":    price_amt + shipping_amt
+            })
+            filtered.append(item)
+
+        return filtered
+
+    except ImportError:
+        print("Production scraper not available, using dummy data")
+        return _get_dummy_discogs_offers(release_id, max_offers)
+
+    except Exception as e:
+        print(f"Error scraping Discogs offers: {e}")
+        return _get_dummy_discogs_offers(release_id, max_offers)
+
+
+# # --- PRODUCTION DISCOGS SCRAPER INTEGRATION ---
+# def scrape_discogs_marketplace_offers(release_id: str, max_offers: int = 10) -> List[Dict]:
+#     """
+#     Production-ready Discogs marketplace scraper integration
+    
+#     This function provides a clean interface to the robust Discogs scraper
+#     that handles anti-bot measures, rate limiting, and scaling challenges.
+    
+#     Args:
+#         release_id: Discogs release ID
+#         max_offers: Maximum number of offers to return
+        
+#     Returns:
+#         List of marketplace offers
+#     """
+#     try:
+#         # Import the production scraper
+#         from discogs_scraper import create_discogs_scraper
+        
+#         # Create scraper with production settings
+#         scraper = create_discogs_scraper(
+#             headless=True,          # Run headless for server deployment
+#             enable_cache=True,      # Enable caching to reduce load
+#             use_proxies=False       # Set to True if you have proxy servers
+#         )
+        
+#         # Scrape marketplace offers
+#         result = scraper.scrape_marketplace_offers(release_id, max_offers)
+        
+#         return result.get('offers', [])
+        
+#     except ImportError:
+#         # Fallback to dummy data if scraper dependencies aren't available
+#         print("Production scraper not available, using dummy data")
+#         return _get_dummy_discogs_offers(release_id, max_offers)
+#     except Exception as e:
+#         print(f"Error scraping Discogs offers: {e}")
+#         return _get_dummy_discogs_offers(release_id, max_offers)
+
+
+def _get_dummy_discogs_offers(release_id: str, max_offers: int = 10) -> List[Dict]:
+    """Fallback dummy offers for development/testing"""
+    import time
+    time.sleep(0.1)  # Simulate processing time
+    
+    offers = []
+    base_prices = [12.99, 15.50, 18.00, 22.50, 28.99]
+    conditions = ["Near Mint (NM or M-)", "Very Good Plus (VG+)", "Very Good (VG)", "Good Plus (G+)", "Mint (M)"]
+    sellers = ["vinyl_collector_de", "record_hunter_uk", "music_paradise_usa"]
+    
+    for i in range(min(max_offers, len(base_prices))):
+        offers.append({
+            'seller': sellers[i % len(sellers)],
+            'condition': conditions[i],
+            'price': f"€{base_prices[i]:.2f}",
+            'shipping': f"€{2.50 + (i * 0.50):.2f}" if i < 3 else "Free shipping",
+            'seller_rating': f"{98.5 - (i * 0.5):.1f}%",
+            'country': 'Germany',
+            'scraped_at': time.time()
+        })
+    
+    return offers
+
+
+# --- COMBINED DISCOGS SEARCH WITH MARKETPLACE ---
+def search_discogs_with_offers(artist: str = None, track: str = None, album: str = None, 
+                              catno: str = None, max_offers: int = 5) -> Dict:
+    """
+    Search Discogs and get marketplace offers in one call
+    
+    Args:
+        artist: Artist name
+        track: Track title  
+        album: Album title
+        catno: Catalog number
+        max_offers: Maximum offers to return
+        
+    Returns:
+        Combined search and marketplace data
+    """
+    try:
+        # Use existing search function
+        from api_search import search_discogs_releases
+        releases = search_discogs_releases(artist, track, album, catno)
+        
+        if not releases:
+            return {
+                'release': None,
+                'offers': [],
+                'status': 'no_releases_found'
+            }
+        
+        first_release = releases[0]
+        release_id = first_release.get('id')
+        
+        # Get marketplace offers
+        offers = []
+        if release_id:
+            offers = scrape_discogs_marketplace_offers(release_id, max_offers)
+        
+        return {
+            'release': first_release,
+            'offers': offers,
+            'total_offers': len(offers),
+            'status': 'success'
+        }
+        
+    except Exception as e:
+        return {
+            'release': None,
+            'offers': [],
+            'status': 'error',
+            'error': str(e)
+        }

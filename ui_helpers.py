@@ -1,0 +1,864 @@
+# ui_helpers.py
+
+import streamlit as st
+from scrape_search import search_revibed, scrape_discogs_marketplace_offers
+# Passe den Import-Pfad hier an, je nachdem wo du get_platform_info und is_fuzzy_match definiert hast:
+from api_search import get_itunes_release_info, search_discogs_releases, get_discogs_release_details, get_discogs_offers
+from utils import (get_platform_info, is_fuzzy_match, CURRENCY_MAPPING, 
+                   CONDITION_HIERARCHY, HIGH_QUALITY_CONDITIONS, parse_price)
+import requests
+from api_search import get_discogs_release_details
+
+# --- Unified Hit Detection Logic ---
+def is_valid_result(entry, check_empty_title=True):
+    """Unified function to check if a result is valid (not a 'no hit' response)"""
+    title = (entry.get("title") or "").strip().lower()
+    invalid_titles = ["kein treffer", "fehler / kein treffer", "", "nicht gesucht (angaben fehlen)", "fehler"]
+    
+    if check_empty_title:
+        return title and title not in invalid_titles
+    else:
+        return title not in invalid_titles
+
+def get_user_location():
+    """Get user location via IP for currency zone detection"""
+    if 'user_location' in st.session_state:
+        return st.session_state.user_location
+    
+    try:
+        r = requests.get("https://ipinfo.io/json", timeout=3)
+        if r.status_code == 200:
+            data = r.json()
+            location = {
+                "country": data.get("country", "DE"),  # Default to Germany
+                "city": data.get("city", "Unknown"),
+                "currency": CURRENCY_MAPPING.get(data.get("country", "DE"), "EUR")
+            }
+            st.session_state.user_location = location
+            return location
+    except Exception as e:
+        print(f"Location Error: {e}")
+    
+    # Default location
+    default_location = {"country": "DE", "city": "Unknown", "currency": "EUR"}
+    st.session_state.user_location = default_location
+    return default_location
+
+
+def ask_user_location():
+    """Interactive location selection for better currency filtering"""
+    st.markdown("### 📍 Your Location")
+    
+    # Auto-detect first
+    auto_location = get_user_location()
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Country selection
+        country_options = {
+            '🇩🇪 Germany': {'country': 'DE', 'currency': 'EUR'},
+            '🇺🇸 United States': {'country': 'US', 'currency': 'USD'},
+            '🇬🇧 United Kingdom': {'country': 'GB', 'currency': 'GBP'},
+            '🇫🇷 France': {'country': 'FR', 'currency': 'EUR'},
+            '🇳🇱 Netherlands': {'country': 'NL', 'currency': 'EUR'},
+            '🇨🇦 Canada': {'country': 'CA', 'currency': 'CAD'},
+            '🇦🇺 Australia': {'country': 'AU', 'currency': 'AUD'},
+            '🇨🇭 Switzerland': {'country': 'CH', 'currency': 'CHF'},
+            '🌍 Other': {'country': 'OTHER', 'currency': 'EUR'}
+        }
+        
+        # Pre-select based on auto-detection
+        auto_detected = "🇩🇪 Germany"  # Default
+        for display_name, info in country_options.items():
+            if info['country'] == auto_location['country']:
+                auto_detected = display_name
+                break
+        
+        selected_country = st.selectbox(
+            "Select your country/region:",
+            options=list(country_options.keys()),
+            index=list(country_options.keys()).index(auto_detected),
+            key="user_country_selector"
+        )
+        
+        user_location = country_options[selected_country]
+        user_location['city'] = auto_location.get('city', 'Unknown')
+        
+    with col2:
+        st.markdown(f"**Currency:** {user_location['currency']}")
+        st.markdown(f"**Detected:** {auto_location['city']}, {auto_location['country']}")
+    
+    # Update session state
+    st.session_state.user_location = user_location
+    return user_location
+
+
+def filter_offers_by_currency(offers, preferred_currency):
+    """Filter and sort offers by preferred currency"""
+    # Parse all offers and add currency info
+    parsed_offers = []
+    
+    for offer in offers:
+        price_amount, price_currency = parse_price(offer.get('price', ''))
+        shipping_amount, shipping_currency = parse_price(offer.get('shipping', ''))
+        
+        # Use price currency as primary
+        offer_currency = price_currency
+        
+        parsed_offer = offer.copy()
+        parsed_offer.update({
+            'price_amount': price_amount,
+            'price_currency': offer_currency,
+            'shipping_amount': shipping_amount,
+            'total_amount': price_amount + shipping_amount,
+            'currency_match': offer_currency == preferred_currency
+        })
+        parsed_offers.append(parsed_offer)
+    
+    # Sort: preferred currency first, then by total price
+    parsed_offers.sort(key=lambda x: (
+        not x['currency_match'],  # Preferred currency first
+        x['total_amount']         # Then by total price
+    ))
+    
+    return parsed_offers
+
+
+def filter_offers_by_condition(offers, high_quality_only=False):
+    """Filter offers by condition quality"""
+    if not high_quality_only:
+        return offers
+    
+    filtered_offers = []
+    for offer in offers:
+        condition = offer.get('condition', '')
+        
+        # Extract main condition (sometimes includes sleeve condition)
+        main_condition = condition.split('\n')[0] if '\n' in condition else condition
+        main_condition = main_condition.replace('Zustand des Tonträgers: ', '').strip()
+        
+        if any(hq_condition in main_condition for hq_condition in HIGH_QUALITY_CONDITIONS):
+            filtered_offers.append(offer)
+    
+    return filtered_offers
+
+def search_discogs_offers_simplified(selected_release):
+    """Simplified offers display - show offers for selected release"""
+    
+    # Get user location automatically (no selection UI)
+    user_location = get_user_location()
+    preferred_currency = user_location['currency']
+    
+    # Show location info
+    st.caption(f"Detected location: {user_location.get('city', 'Unknown')}, {user_location['country']} ({preferred_currency})")
+    
+    # Add quality toggle
+    high_quality_only = st.checkbox(
+        "Show only VG+ or better",
+        value=False,
+        key=f"quality_toggle_{selected_release.get('id', 'unknown')}",
+        help="Show only Mint, Near Mint, and Very Good Plus conditions"
+    )
+    
+    # Get release info
+    release_id = selected_release.get("id") or selected_release.get("uri", "").split("/")[-1]
+    
+    if not release_id:
+        st.error("Release-ID nicht gefunden.")
+        return
+    
+    # Show loading state
+    with st.spinner(f"Loading offers..."):
+        try:
+            # Get offers from production scraper with user location
+            offers = scrape_discogs_marketplace_offers(release_id, max_offers=15, user_country=user_location['country'])
+            # offers = get_discogs_offers(release_id, currency="EUR", country=user_location['country'])
+
+            if not offers:
+                st.info("📭 No marketplace offers found for this release.")
+                return
+            
+            # Apply strict currency filtering - only show preferred currency
+            preferred_currency_offers = []
+            for offer in offers:
+                price_amount, price_currency = parse_price(offer.get('price', ''))
+                if price_currency == preferred_currency:
+                    offer_copy = offer.copy()
+                    offer_copy.update({
+                        'price_amount': price_amount,
+                        'price_currency': price_currency
+                    })
+                    # Parse shipping too
+                    shipping_amount, shipping_currency = parse_price(offer.get('shipping', ''))
+                    offer_copy.update({
+                        'shipping_amount': shipping_amount,
+                        'total_amount': price_amount + shipping_amount
+                    })
+                    preferred_currency_offers.append(offer_copy)
+            
+            # Store all offers in session state for quality filtering
+            if f"all_offers_{release_id}" not in st.session_state:
+                st.session_state[f"all_offers_{release_id}"] = preferred_currency_offers
+            
+            # Apply quality filter if enabled (client-side filtering, no reload)
+            if high_quality_only:
+                preferred_currency_offers = filter_offers_by_condition(st.session_state[f"all_offers_{release_id}"], high_quality_only)
+            else:
+                preferred_currency_offers = st.session_state[f"all_offers_{release_id}"]
+            
+            # Sort by total price
+            preferred_currency_offers.sort(key=lambda x: x.get('total_amount', 0))
+            
+            # Display offers directly (no stats, no buttons)
+            if preferred_currency_offers:
+                for i, offer in enumerate(preferred_currency_offers[:10], 1):
+                    # Debug: Print offer URL to console
+                    print(f"Offer {i} URL: {offer.get('offer_url', 'NO URL')}")
+                    display_single_offer_clean(offer, i, preferred_currency, selected_release)
+            else:
+                quality_msg = " in VG+ or better condition" if high_quality_only else ""
+                st.info(f"No offers found in {preferred_currency}{quality_msg}.")
+        
+        except Exception as e:
+            st.error(f"❌ Error loading offers: {str(e)}")
+
+def search_discogs_offers(release, selected_release):
+    """Search and display Discogs offers for selected release with updated scraper integration"""
+    st.markdown("---")
+    st.markdown("### 🛒 Discogs Marketplace Offers")
+    
+    # Get user location preference
+    user_location = ask_user_location()
+    preferred_currency = user_location['currency']
+    
+    # Get release info
+    release_title = selected_release.get('title', 'Unknown Release')
+    release_id = selected_release.get("id") or selected_release.get("uri", "").split("/")[-1]
+    
+    if not release_id:
+        st.error("Release-ID nicht gefunden.")
+        return
+    
+    # Quality filter toggle and controls
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        st.markdown(f"**Searching offers for:** {release_title}")
+    
+    with col2:
+        high_quality_only = st.checkbox(
+            "Only VG+ or better",
+            value=False,
+            key=f"quality_filter_{release_id}",
+            help="Show only Mint, Near Mint, and Very Good Plus conditions"
+        )
+    
+    with col3:
+        if st.button("🔄 Refresh Offers", key=f"refresh_{release_id}"):
+            # Clear any cached data for this release
+            if hasattr(st.session_state, 'marketplace_cache'):
+                cache_key = f"{release_id}_15"
+                if cache_key in st.session_state.marketplace_cache:
+                    del st.session_state.marketplace_cache[cache_key]
+    
+    # Show loading state
+    with st.spinner(f"Searching marketplace offers... (Currency: {preferred_currency})"):
+        try:
+            # Get offers from production scraper
+            offers = scrape_discogs_marketplace_offers(release_id, max_offers=15)
+            
+            if not offers:
+                st.info("📭 No marketplace offers found for this release.")
+                return
+            
+            # Apply filters
+            filtered_offers = filter_offers_by_condition(offers, high_quality_only)
+            currency_filtered_offers = filter_offers_by_currency(filtered_offers, preferred_currency)
+            
+            # Display statistics
+            col_stats1, col_stats2, col_stats3 = st.columns(3)
+            
+            with col_stats1:
+                st.metric("Total Offers", len(offers))
+            
+            with col_stats2:
+                preferred_currency_count = sum(1 for offer in currency_filtered_offers 
+                                             if offer.get('currency_match', False))
+                st.metric(f"{preferred_currency} Offers", preferred_currency_count)
+            
+            with col_stats3:
+                if high_quality_only:
+                    st.metric("High Quality", len(filtered_offers))
+                else:
+                    st.metric("After Filters", len(currency_filtered_offers))
+            
+            # Display offers
+            if currency_filtered_offers:
+                st.markdown("**📋 Marketplace Offers** (sorted by currency preference & price):")
+                
+                for i, offer in enumerate(currency_filtered_offers[:15], 1):
+                    display_single_offer(offer, i, preferred_currency)
+                
+                # Show summary of currency distribution
+                if len(currency_filtered_offers) > 0:
+                    currency_stats = {}
+                    for offer in currency_filtered_offers:
+                        curr = offer.get('price_currency', 'Unknown')
+                        currency_stats[curr] = currency_stats.get(curr, 0) + 1
+                    
+                    if len(currency_stats) > 1:
+                        st.caption(f"💱 Currency distribution: {dict(currency_stats)}")
+            
+            else:
+                if high_quality_only:
+                    st.info("🔍 No offers found in VG+ or better condition. Try unchecking the quality filter.")
+                else:
+                    st.info("📭 No offers match your location preferences.")
+        
+        except Exception as e:
+            st.error(f"❌ Error loading marketplace offers: {str(e)}")
+            st.caption("This might be due to rate limiting or connection issues. Try refreshing in a moment.")
+
+
+def display_single_offer(offer, index, preferred_currency):
+    """Display a single marketplace offer"""
+    
+    # Parse offer data
+    price_amount = offer.get('price_amount', 0)
+    price_currency = offer.get('price_currency', 'EUR')
+    shipping_amount = offer.get('shipping_amount', 0)
+    total_amount = offer.get('total_amount', price_amount + shipping_amount)
+    
+    condition = offer.get('condition', 'Unknown')
+    seller = offer.get('seller', 'Unknown')
+    seller_rating = offer.get('seller_rating', '')
+    country = offer.get('country', '')
+    
+    # Clean up condition text (remove German labels)
+    clean_condition = condition.replace('Zustand des Tonträgers: ', '').replace('Zustand der Hülle: ', ' / ').strip()
+    
+    # Create offer URL
+    offer_url = offer.get('offer_url', '#')
+    if offer_url == '#' and seller != 'Unknown':
+        offer_url = f"https://www.discogs.com/seller/{seller}"
+    
+    # Currency preference indicator
+    currency_icon = "🎯" if price_currency == preferred_currency else "💱"
+    
+    # Quality indicator
+    quality_score = CONDITION_HIERARCHY.get(clean_condition.split('\n')[0].split(' /')[0], 0)
+    if quality_score >= 3:
+        quality_icon = "💎"  # High quality
+    elif quality_score >= 1:
+        quality_icon = "✨"  # Good quality
+    else:
+        quality_icon = "📦"  # Lower quality
+    
+    # Format prices - handle string and numeric values
+    try:
+        price_val = float(price_amount) if price_amount else 0
+        price_str = f"{price_val:.2f} {price_currency}"
+    except (ValueError, TypeError):
+        price_str = f"{price_amount} {price_currency}" if price_amount else f"0.00 {price_currency}"
+    
+    try:
+        shipping_val = float(shipping_amount) if shipping_amount else 0
+        shipping_str = f"{shipping_val:.2f} {price_currency}" if shipping_val > 0 else "Free"
+    except (ValueError, TypeError):
+        shipping_str = str(shipping_amount) if shipping_amount and shipping_amount != "0" else "Free"
+    
+    try:
+        total_val = float(total_amount) if total_amount else (price_val + shipping_val)
+        total_str = f"{total_val:.2f} {price_currency}"
+    except (ValueError, TypeError):
+        total_str = f"{total_amount} {price_currency}" if total_amount else price_str
+    
+    # Display the offer
+    with st.container():
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            # Main offer info
+            st.markdown(f"""
+            **{index}.** {currency_icon} **[{total_str}]({offer_url})** {quality_icon}  
+            📀 *{clean_condition}*  
+            👤 *{seller}* {f"({seller_rating})" if seller_rating else ""} {f"🌍 {country}" if country else ""}
+            """)
+        
+        with col2:
+            # Price breakdown
+            st.markdown(f"""
+            💰 **{price_str}**  
+            🚚 *+ {shipping_str}*
+            """)
+        
+        # Add separator
+        if index < 15:  # Don't add separator after last item
+            st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid #eee;'>", 
+                       unsafe_allow_html=True)
+
+def display_single_offer_clean(offer, index, preferred_currency, selected_release):
+    """Display a single marketplace offer without emojis and with correct links"""
+    
+    # Parse offer data
+    price_amount = offer.get('price_amount', 0)
+    price_currency = offer.get('price_currency', 'EUR')
+    shipping_amount = offer.get('shipping_amount', 0)
+    total_amount = offer.get('total_amount', price_amount + shipping_amount)
+    
+    condition = offer.get('condition', 'Unknown')
+    seller = offer.get('seller', 'Unknown')
+    seller_rating = offer.get('seller_rating', '')
+    country = offer.get('country', '')
+    
+    # Clean up condition text
+    clean_condition = condition.replace('Zustand des Tonträgers: ', '').replace('Zustand der Hülle: ', ' / ').strip()
+    
+    # Use specific offer URL instead of release URL
+    offer_url = offer.get('offer_url', '')
+    if not offer_url:
+        # Fallback to release URL if offer URL not available
+        release_uri = selected_release.get('uri', '')
+        offer_url = f"https://www.discogs.com{release_uri}" if release_uri else "#"
+    
+    # Format prices - handle string and numeric values
+    try:
+        price_val = float(price_amount) if price_amount else 0
+        price_str = f"{price_val:.2f} {price_currency}"
+    except (ValueError, TypeError):
+        price_str = f"{price_amount} {price_currency}" if price_amount else f"0.00 {price_currency}"
+    
+    try:
+        shipping_val = float(shipping_amount) if shipping_amount else 0
+        shipping_str = f"{shipping_val:.2f} {price_currency}" if shipping_val > 0 else "Free"
+    except (ValueError, TypeError):
+        shipping_str = str(shipping_amount) if shipping_amount and shipping_amount != "0" else "Free"
+    
+    try:
+        total_val = float(total_amount) if total_amount else (price_val + shipping_val)
+        total_str = f"{total_val:.2f} {price_currency}"
+    except (ValueError, TypeError):
+        total_str = f"{total_amount} {price_currency}" if total_amount else price_str
+    
+    # Display the offer without emojis
+    with st.container():
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            # Main offer info without emojis
+            st.markdown(f"""
+            **{index}.** **[{total_str}]({offer_url})**  
+            *{clean_condition}*  
+            *{seller}* {f"({seller_rating})" if seller_rating else ""} {f"{country}" if country else ""}
+            """)
+        
+        with col2:
+            # Price breakdown
+            st.markdown(f"""
+            **{price_str}**  
+            *+ {shipping_str}*
+            """)
+        
+        # Add separator
+        if index < 10:  # Don't add separator after last item
+            st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid #eee;'>", 
+                       unsafe_allow_html=True)
+
+def show_live_results():
+    pass
+
+
+def show_digital_block():
+    PLACEHOLDER_COVER = "cover_placeholder.png"   # neutrales Bild
+    NO_HIT_COVER     = "not_found.png"            # durchgestrichenes Bild
+
+    all_results = st.session_state.results_digital
+    user_track  = st.session_state.track_for_search.strip()
+
+    st.markdown("#### Digital results")
+
+    # Use unified hit detection
+    def is_real_hit(entry):
+        return is_valid_result(entry, check_empty_title=False)
+
+    # real_hits = [
+    #     entry for entry in all_results
+    #     if is_real_hit(entry) and entry.get("platform","").lower() != "itunes"
+    # ]
+    real_hits = [
+        r for r in st.session_state.results_digital
+        if (r.get("title") or "").strip().lower() not in ("kein treffer", "", "fehler")
+    ]
+
+    any_hit = len(real_hits) > 0
+
+    # Display all digital results in order of availability
+    for entry in all_results:
+        platform_str = entry.get("platform", "")
+        title_str    = str(entry.get("title", ""))
+        artist_str   = str(entry.get("artist", ""))
+        album_str    = str(entry.get("album", ""))
+        label_raw    = entry.get("label", "")
+        label_str    = label_raw[0] if isinstance(label_raw, list) and label_raw else str(label_raw)
+        price_str    = str(entry.get("price", ""))
+        cover_url    = entry.get("cover_url", "") or entry.get("cover", "")
+        release_url  = entry.get("url", "").strip()
+        platform_url, _ = get_platform_info(platform_str)
+
+        # Bildauswahl
+        if not cover_url or not cover_url.strip():
+            cover_url = NO_HIT_COVER if not is_real_hit(entry) else PLACEHOLDER_COVER
+
+        # Fuzzy Matching für Beatport
+        highlight = (platform_str == "Beatport" and is_fuzzy_match(user_track, title_str))
+
+        cols = st.columns([1, 5])
+        with cols[0]:
+            st.image(cover_url, width=92)
+        with cols[1]:
+            if release_url:
+                st.markdown(f"[**{platform_str}**]({release_url})", unsafe_allow_html=True)
+            else:
+                st.markdown(f"[**{platform_str}**]({platform_url})", unsafe_allow_html=True)
+
+            if highlight:
+                st.markdown(f":red[**{title_str}**]")
+            else:
+                st.markdown(f"**{title_str}**")
+
+            if artist_str:
+                st.markdown(f"{artist_str}")
+            if album_str:
+                st.markdown(f"*{album_str}*")
+            if label_str:
+                st.markdown(f"`{label_str}`")
+            if price_str and release_url:
+                st.markdown(f"[{price_str}]({release_url})", unsafe_allow_html=True)
+            elif price_str:
+                st.markdown(f":green[{price_str}]")
+            if platform_str == "iTunes" and entry.get("preview") and is_real_hit(entry):
+                st.audio(entry["preview"], format="audio/mp4")
+
+        st.markdown("---")
+
+    # Only show mode switch button when there are digital hits
+    if any_hit:
+        # Button logic: search vs switch mode
+        if not st.session_state.get("secondary_search_done", False):
+            # First time clicking - perform search
+            if st.button("Search on Discogs and Revibed", key="discogs_search_digital"):
+                st.session_state.discogs_revibed_mode = True
+                st.session_state.show_digital         = False
+                artist  = st.session_state.artist_input.strip()
+                album   = st.session_state.album_input.strip()
+                track   = st.session_state.track_for_search.strip()
+                
+                # Search is now handled by provider system in main.py
+                # st.session_state.results_discogs will be set by DiscogsProvider
+                if album:
+                    st.session_state.results_revibed = search_revibed('', album)
+                elif artist:
+                    st.session_state.results_revibed = search_revibed(artist, '')
+                else:
+                    st.session_state.results_revibed = [{
+                        'platform': 'Revibed',
+                        'title':'','artist':'','album':'','label':'','price':'',
+                        'cover_url':'','url':'','search_time':0.0,
+                        'message': "Für Revibed-Suche mindestens Album ODER Artist ausfüllen."
+                    }]
+                
+                st.session_state.secondary_search_done = True
+                st.rerun()
+        else:
+            # Search already done - just switch view
+            if st.button("Zu Discogs und Revibed wechseln", key="switch_to_secondary"):
+                st.session_state.discogs_revibed_mode = True
+                st.session_state.show_digital         = False
+                st.rerun()
+
+# Create intensity-based colors for Have/Want like Discogs
+def get_intensity_color(count, color_type):
+    if count == "-" or count == 0:
+        return f":{color_type}[{count}]"
+    
+    try:
+        num = int(count)
+        if color_type == "green":  # Have count
+            if num < 10:
+                return f":green[{count}]"
+            elif num < 100:
+                return f"**:green[{count}]**"  # Darker green
+            else:
+                return f"**:green[{count}]**"  # Very dark green
+        else:  # Want count - use red instead of orange
+            if num < 10:
+                return f":red[{count}]"
+            elif num < 100:
+                return f"**:red[{count}]**"  # Darker red
+            else:
+                return f"**:red[{count}]**"  # Very dark red
+    except:
+        return f":{color_type}[{count}]"
+
+
+
+def show_discogs_and_revibed_block(releases, track_for_search, revibed_results):
+    PLACEHOLDER_COVER = "cover_placeholder.png"
+    NO_HIT_COVER      = "not_found.png"
+
+    # Check if there are any Revibed hits for display logic
+    # Use unified hit detection  
+    def is_real_revibed_hit(entry):
+        return is_valid_result(entry, check_empty_title=True)
+    
+    real_revibed_hits = [r for r in revibed_results if is_real_revibed_hit(r)]
+    has_revibed_hits = len(real_revibed_hits) > 0
+    
+    # Scenario 4: No hits anywhere: user must check his input
+    if not has_revibed_hits and not st.session_state.get("has_digital_hits", False) and not releases:
+        st.error("❌ **Keine Treffer gefunden auf allen Plattformen**")
+        st.markdown("""
+            <div style="text-align:center; margin-top:1em; margin-bottom:2em; padding:1em; background-color:#f8f9fa; border-radius:10px; border-left:4px solid #dc3545;">
+                <div style="font-size:1.2em; color:#dc3545; margin-bottom:0.5em;">
+                    📝 Bitte überprüfe deine Eingaben:
+                </div>
+                <div style="color:#6c757d;">
+                    • Schreibweise von Artist/Track/Album<br>
+                    • Vollständige Namen verwenden<br>
+                    • Alternative Schreibweisen probieren<br>
+                    • Weniger spezifische Suchbegriffe nutzen
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        if st.button("🔄 Reset Search", key="reset_search_no_hits"):
+            # Reset all search states
+            st.session_state.suche_gestartet = False
+            st.session_state.digital_search_done = False
+            st.session_state.secondary_search_done = False
+            st.session_state.has_digital_hits = False
+            st.session_state.show_digital = True
+            st.session_state.discogs_revibed_mode = False
+            st.session_state.results_digital = []
+            st.session_state.results_discogs = []
+            st.session_state.results_revibed = []
+            st.rerun()
+           # Scenario 3: No digital, no Revibed hits - show Gem GIF
+    elif not has_revibed_hits and not st.session_state.get("has_digital_hits", False):
+        st.markdown("""
+            <div style="text-align:center; margin-top:2em; margin-bottom:2em;">
+                <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExaHN1YWc1ZjgwdDg0bnd6eXRqbmM4bG9ndmh4ZDYybWJqOTFoZjQ2YiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/trHKezeRU0OPRyVYvI/giphy.gif"
+                     style="width: 180px; border-radius:30px;" alt="Diamond Gem" />
+                <div style="font-size:2em; color:#17e6ff; font-weight:bold; margin-top:0.5em; letter-spacing:0.05em; text-shadow: 0 0 20px #89ffff;">
+                    You found a true gem
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # --- Discogs-Block ---
+    # Headers on same line
+    header_col1, header_col2 = st.columns([1, 1])
+    with header_col1:
+        st.markdown("#### Discogs Releases")
+    with header_col2:
+        st.markdown("#### Offers in your currency")
+    
+    print(f"UI: Received {len(releases)} releases from API")
+    for i, r in enumerate(releases[:3]):
+        print(f"UI Release {i+1}: ID={r.get('id')}, Title={r.get('title')}")
+    if releases:
+        # Two-column layout: Release info on left, offers on right
+        release_col, offers_col = st.columns([1, 1])
+        
+        with release_col:
+            # Radio button selection without label
+            selected_idx = st.radio(
+                "",  # Empty label
+                options=list(range(len(releases))),
+                index=st.session_state.get("release_selected_idx", 0),
+                format_func=lambda i: (
+                    f"{releases[i].get('title', '-')}"
+                    f" – {releases[i].get('label', ['-'])[0] if releases[i].get('label') else '-'}"
+                    f" ({releases[i].get('year', '-')})"
+                ),
+                key="release_select"
+            )
+            st.session_state.release_selected_idx = selected_idx
+
+            # Cover and details for selected release
+            if selected_idx < len(releases):
+                r = releases[selected_idx]
+                
+                # Cover image - API returns cover_image as primary field
+                cover_url = r.get("cover_image") or r.get("cover") or r.get("thumb")
+                if not cover_url or not cover_url.strip():
+                    cover_url = PLACEHOLDER_COVER
+                st.image(cover_url, width=200)
+
+                # Detailed metadata
+                label_raw = r.get("label", ["-"])
+                label_str = label_raw[0] if isinstance(label_raw, list) and label_raw else str(label_raw)
+                format_list = r.get("format", [])
+                format_str  = ", ".join(format_list) if isinstance(format_list, list) else str(format_list)
+                year_str    = r.get("year", "-")
+                catno_str   = r.get("catno", "-")
+                title_str   = r.get("title", "-")
+                url         = r.get("uri") or r.get("url") or ""
+                community   = r.get("community", "-")
+
+                # Display detailed info
+                st.markdown(f"**{title_str}**")
+                st.markdown(f"**Label:** `{label_str}`")
+                st.markdown(f"**Jahr:** {year_str}")
+                st.markdown(f"**Format:** {format_str}")
+                st.markdown(f"**Katalog:** `{catno_str}`")
+                
+                # Have/Want ratio - get from API details with caching
+                release_id = r.get("id")
+                # if release_id:
+                #     # Cache release details to avoid repeated API calls
+                #     cache_key = f"release_details_{release_id}"
+                #     # if cache_key not in st.session_state:
+                #     #     try:
+                #     #         print(f"Fetching release details for {release_id} (not cached)")
+                #     #         details = get_discogs_release_details(release_id)
+                #     #         st.session_state[cache_key] = details
+                #     #     except Exception as e:
+                #     #         print(f"Error getting release details: {e}")
+                #     #         st.session_state[cache_key] = {}
+                #     # else:
+                #     #     print(f"Using cached release details for {release_id}")
+                    
+                #     details = st.session_state[cache_key]
+                #     # community = details.get("community", {})
+                #     have_count = community.get("have", r.get("community", {}).get("have", "-"))
+                #     want_count = community.get("want", r.get("community", {}).get("want", "-"))
+                # else:
+                community = r.get("community", {})
+                have_count = community.get("have", "-")
+                want_count = community.get("want", "-")
+                                
+                have_color = get_intensity_color(have_count, "green")
+                want_color = get_intensity_color(want_count, "red")
+                st.markdown(f"**Have/Want:** {have_color}/{want_color}")
+                
+                # Original search info
+                if st.session_state.artist_input:
+                    st.markdown(f"**Artist:** {st.session_state.artist_input}")
+                if st.session_state.album_input:
+                    st.markdown(f"**Album:** {st.session_state.album_input}")
+                if track_for_search:
+                    st.markdown(f"**Track:** {track_for_search}")
+                
+                if url:
+                    st.markdown(f"[Discogs Release →](https://www.discogs.com{url})")
+
+        # Show offers in right column when button is clicked
+        with offers_col:
+            if (selected_idx < len(releases) and 
+                st.session_state.get("show_offers", False) and 
+                st.session_state.get("offers_for_release") == selected_idx):
+                search_discogs_offers_simplified(releases[selected_idx])
+            elif selected_idx < len(releases):
+                st.info("Click 'Search for Offers' to see marketplace listings")
+
+        # Show full tracklist in the release column
+        if selected_idx < len(releases):
+            r = releases[selected_idx]
+            
+            # Get full tracklist from details API with caching
+            release_id = r.get("id")
+            if release_id:
+                # Use the same cached details from above
+                cache_key = f"release_details_{release_id}"
+                if cache_key in st.session_state:
+                    details = st.session_state[cache_key]
+                    full_tracklist = details.get("tracklist", [])
+                else:
+                    # Fallback if somehow not cached yet
+                    full_tracklist = r.get("tracklist", [])
+            else:
+                full_tracklist = r.get("tracklist", [])
+            
+            with release_col:
+                if full_tracklist:
+                    st.markdown("**Tracklist:**")
+                    tracklist_text = ""
+                    for t in full_tracklist:
+                        if isinstance(t, dict):
+                            position = t.get("position", "")
+                            track_title = t.get("title", "")
+                            duration = t.get("duration", "")
+                        else:
+                            position = ""
+                            track_title = str(t)
+                            duration = ""
+                        
+                        # Check if this is the searched track
+                        if track_title and track_title.lower() == track_for_search.strip().lower():
+                            # Highlight searched track in red
+                            track_line = f"{position} {track_title}" if position else track_title
+                            tracklist_text += f":red[**{track_line}**]  \n"
+                        else:
+                            track_line = f"{position} {track_title}" if position else track_title
+                            tracklist_text += f"{track_line}  \n"
+                    
+                    st.markdown(tracklist_text)
+                
+                # Move search button below tracklist
+                search_button_key = f"search_offers_btn_{selected_idx}"
+                if st.button("Search for Offers", key=search_button_key):
+                    st.session_state.show_offers = True
+                    st.session_state.offers_for_release = selected_idx
+        st.markdown("---")
+    else:
+        st.image(NO_HIT_COVER, width=92)
+        st.info("Keine Discogs-Releases gefunden.")
+
+    # --- Revibed-Block ---
+    st.markdown("#### Revibed: Treffer zu Artist und Release")
+    
+    if has_revibed_hits:
+        # Style like digital releases
+        for entry in real_revibed_hits:
+            st.markdown("""
+                <div style="margin-bottom:1.7em; border:1px solid #e2e6ed; border-radius:14px; padding:0.7em 1.1em; box-shadow:0 2px 16px #d8f7fd40;">
+                    <div style="font-size:1.1em; font-weight:bold; color:#1ad6cc; margin-bottom:0.5em;">
+                        Revibed
+                    </div>
+                    {cover_image}
+                    <span style="font-weight:600;">{title}</span><br>
+                    <span style="color:#666;">{artist}</span><br>
+                    <span style="color:#333;">{album}</span><br>
+                    <span style="color:#aaa;">{label}</span><br>
+                    <span style="color:#1ad64a; font-weight:600; font-size:1.07em;">
+                        {price}
+                    </span><br>
+                </div>
+            """.format(
+                cover_image="<a href='{}' target='_blank'><img src='{}' style='width:100px; margin-bottom:0.6em; border-radius:9px; box-shadow:0 2px 10px #e4f8ff;'></a><br>".format(entry.get('url',''), entry.get('cover_url','') or entry.get('cover','')) if (entry.get("cover_url") or entry.get("cover")) else "",
+                title=entry.get('title', ''),
+                artist=entry.get('artist', ''),
+                album=entry.get('album', ''),
+                label=entry.get('label', ''),
+                price=entry.get('price', '')
+            ), unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <div style="margin-bottom:1.7em; border:1px solid #e2e6ed; border-radius:14px; padding:0.7em 1.1em; box-shadow:0 2px 16px #d8f7fd40;">
+                <div style="font-size:1.1em; font-weight:bold; color:#1ad6cc; margin-bottom:0.5em;">
+                    Revibed
+                </div>
+                <span style="color:#666;">Keine Treffer</span>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # --- Zurück-Button: Only show if there were digital hits (Scenario 1) ---
+    # Scenario 1: Digital hits exist -> show back button
+    # Scenario 2 & 3: No digital hits -> no back button
+    if st.session_state.get("has_digital_hits", False):
+        if st.button("Zurück zu digitalen Shops", key="digital_back_revibed"):
+            st.session_state.discogs_revibed_mode = False
+            st.session_state.show_digital         = True
+            st.rerun()

@@ -618,9 +618,6 @@ elif st.session_state.suche_gestartet and not app_state.is_cache_valid():
 
 # Display cached results if search already done and cache is valid
 elif st.session_state.suche_gestartet and app_state.is_cache_valid():
-    # Show info that cached results are being displayed
-    st.info("📦 Showing cached results for current search criteria")
-    
     if st.session_state.show_digital and st.session_state.digital_search_done:
         # Show cached digital results
         with digital_container:

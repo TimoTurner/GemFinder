@@ -2,12 +2,85 @@
 
 import streamlit as st
 from scrape_search import search_revibed, scrape_discogs_marketplace_offers
+from selenium_scraper import selenium_filter_offers_parallel
 # Passe den Import-Pfad hier an, je nachdem wo du get_platform_info und is_fuzzy_match definiert hast:
 from api_search import get_itunes_release_info, search_discogs_releases, get_discogs_release_details, get_discogs_offers
 from utils import (get_platform_info, is_fuzzy_match, CURRENCY_MAPPING, 
                    CONDITION_HIERARCHY, HIGH_QUALITY_CONDITIONS, parse_price)
 import requests
 from api_search import get_discogs_release_details
+from bs4 import BeautifulSoup
+
+def check_offer_shipping_availability(offer_url, user_country):
+    """
+    Check if an offer is available for shipping to user's country
+    by fetching the offer page and parsing the shipping info.
+    
+    Returns: True if available, False if restricted
+    """
+    try:
+        # Use more comprehensive headers to avoid 403 blocks
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none'
+        }
+        
+        # Quick timeout for faster processing
+        response = requests.get(offer_url, timeout=5, headers=headers)
+        
+        if response.status_code == 403:
+            print(f"403 Forbidden for {offer_url} - checking if URL indicates unavailability")
+            # If we get 403, we can't check the content, but we can try to be conservative
+            # For now, let's assume it's available and let the user decide
+            return True
+        elif response.status_code != 200:
+            print(f"Failed to fetch offer page: {offer_url} (Status: {response.status_code})")
+            return True  # Assume available if we can't check
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Look for shipping restrictions - check specifically in no_offer container
+        no_offer_container = soup.find('div', class_='inline-buttons no_offer')
+        
+        if no_offer_container:
+            # Look for pricing_info muted within the no_offer container
+            pricing_info = no_offer_container.find('p', class_='pricing_info muted')
+            if pricing_info:
+                shipping_text = pricing_info.get_text().strip()
+                print(f"Found shipping restriction in no_offer container: '{shipping_text}'")
+                
+                # Check for country restrictions
+                user_country_name = {
+                    'DE': 'Germany', 'US': 'United States', 'GB': 'United Kingdom',
+                    'FR': 'France', 'NL': 'Netherlands', 'CA': 'Canada',
+                    'AU': 'Australia', 'CH': 'Switzerland'
+                }.get(user_country, user_country)
+                
+                # Check for unavailability patterns
+                unavailable_patterns = [
+                    f'Unavailable in {user_country_name}',
+                    f'Not available in {user_country_name}',
+                    f'No shipping to {user_country_name}',
+                    'Does not ship to your country'
+                ]
+                
+                for pattern in unavailable_patterns:
+                    if pattern in shipping_text:
+                        print(f"Offer restricted for {user_country_name}: {shipping_text}")
+                        return False
+        
+        return True  # No restrictions found
+        
+    except Exception as e:
+        print(f"Error checking shipping for {offer_url}: {e}")
+        return True  # Assume available if error occurs
 
 # --- Unified Hit Detection Logic ---
 def is_valid_result(entry, check_empty_title=True):
@@ -168,60 +241,103 @@ def search_discogs_offers_simplified(selected_release):
         st.error("Release-ID nicht gefunden.")
         return
     
-    # Show loading state
-    with st.spinner(f"Loading offers..."):
-        try:
-            # Get offers from production scraper with user location
-            offers = scrape_discogs_marketplace_offers(release_id, max_offers=15, user_country=user_location['country'])
-            # offers = get_discogs_offers(release_id, currency="EUR", country=user_location['country'])
+    # Load offers only if not already cached
+    cache_key = f"all_offers_{release_id}"
+    
+    if cache_key not in st.session_state:
+        # Show loading state only for initial load
+        with st.spinner(f"Loading and filtering offers for shipping availability..."):
+            try:
+                # Use original scraper + Selenium enhancement for shipping/availability
+                offers = scrape_discogs_marketplace_offers(release_id, max_offers=8, user_country=user_location['country'])
+                print(f"Scraper returned {len(offers)} offers")
+                
+                # Enhance with Selenium using parallel processing for speed
+                # Uses 5 parallel browsers to process offers simultaneously for maximum speed
+                if offers:
+                    offers = selenium_filter_offers_parallel(offers, user_location['country'], max_workers=5)
+                    print(f"Selenium parallel filtered to {len(offers)} available offers")
 
-            if not offers:
-                st.info("📭 No marketplace offers found for this release.")
-                return
-            
-            # Apply strict currency filtering - only show preferred currency
-            preferred_currency_offers = []
-            for offer in offers:
-                price_amount, price_currency = parse_price(offer.get('price', ''))
-                if price_currency == preferred_currency:
+                if not offers:
+                    st.info("📭 No marketplace offers found for this release.")
+                    return
+                
+                # Process offers - filter out unavailable ones based on shipping info
+                preferred_currency_offers = []
+                for i, offer in enumerate(offers):
+                    # Debug: Print full offer structure to understand data format
+                    if i < 3:  # Only print first 3 offers to avoid spam
+                        print(f"DEBUG Offer {i+1}: {offer}")
+                    
+                    price_amount, price_currency = parse_price(offer.get('price', ''))
+                    
+                    # Filter currency
+                    if price_currency and price_currency != preferred_currency:
+                        print(f"Currency mismatch: got {price_currency}, expected {preferred_currency}")
+                        continue
+                    
+                    # Simplified filter: Skip offers without valid total pricing
+                    # Unavailable offers often have incomplete pricing information
+                    shipping_info = offer.get('shipping', '')
+                    
+                    # Selenium should have already filtered problematic offers
+                    # Only basic validation needed now  
+                    if shipping_info == 'N/A' and not offer.get('selenium_enhanced'):
+                        print(f"Skipping offer {i+1} - no shipping info and not Selenium-enhanced")
+                        continue
+                    
+                    # Skip offers with suspiciously low prices that might indicate errors
+                    if price_amount <= 0:
+                        print(f"Skipping offer {i+1} - invalid price: {price_amount}")
+                        continue
+                    
+                    # Parse shipping and calculate total
+                    shipping_amount, shipping_currency = parse_price(offer.get('shipping', ''))
+                    total_amount = price_amount + shipping_amount
+                    
+                    # Final validation: Skip offers without meaningful total price
+                    if total_amount <= 0 or total_amount > 10000:  # Sanity check for extreme values
+                        print(f"Skipping offer {i+1} - invalid total amount: {total_amount}")
+                        continue
+                    
                     offer_copy = offer.copy()
                     offer_copy.update({
                         'price_amount': price_amount,
-                        'price_currency': price_currency
-                    })
-                    # Parse shipping too
-                    shipping_amount, shipping_currency = parse_price(offer.get('shipping', ''))
-                    offer_copy.update({
+                        'price_currency': price_currency,
                         'shipping_amount': shipping_amount,
-                        'total_amount': price_amount + shipping_amount
+                        'total_amount': total_amount
                     })
                     preferred_currency_offers.append(offer_copy)
-            
-            # Store all offers in session state for quality filtering
-            if f"all_offers_{release_id}" not in st.session_state:
-                st.session_state[f"all_offers_{release_id}"] = preferred_currency_offers
-            
-            # Apply quality filter if enabled (client-side filtering, no reload)
-            if high_quality_only:
-                preferred_currency_offers = filter_offers_by_condition(st.session_state[f"all_offers_{release_id}"], high_quality_only)
-            else:
-                preferred_currency_offers = st.session_state[f"all_offers_{release_id}"]
-            
-            # Sort by total price
-            preferred_currency_offers.sort(key=lambda x: x.get('total_amount', 0))
-            
-            # Display offers directly (no stats, no buttons)
-            if preferred_currency_offers:
-                for i, offer in enumerate(preferred_currency_offers[:10], 1):
-                    # Debug: Print offer URL to console
-                    print(f"Offer {i} URL: {offer.get('offer_url', 'NO URL')}")
-                    display_single_offer_clean(offer, i, preferred_currency, selected_release)
-            else:
-                quality_msg = " in VG+ or better condition" if high_quality_only else ""
-                st.info(f"No offers found in {preferred_currency}{quality_msg}.")
+                
+                # Store all offers in session state for quality filtering
+                st.session_state[cache_key] = preferred_currency_offers
+                
+            except Exception as e:
+                st.error(f"❌ Error loading offers: {str(e)}")
+                return
+    
+    # Apply quality filter on cached data (no reload, instant filtering)
+    try:
+        if high_quality_only:
+            preferred_currency_offers = filter_offers_by_condition(st.session_state[cache_key], high_quality_only)
+        else:
+            preferred_currency_offers = st.session_state[cache_key]
         
-        except Exception as e:
-            st.error(f"❌ Error loading offers: {str(e)}")
+        # Sort by total price
+        preferred_currency_offers.sort(key=lambda x: x.get('total_amount', 0))
+        
+        # Display offers directly (no stats, no buttons)
+        if preferred_currency_offers:
+            for i, offer in enumerate(preferred_currency_offers[:10], 1):
+                # Debug: Print offer URL to console
+                print(f"Offer {i} URL: {offer.get('offer_url', 'NO URL')}")
+                display_single_offer_clean(offer, i, preferred_currency, selected_release)
+        else:
+            quality_msg = " in VG+ or better condition" if high_quality_only else ""
+            st.info(f"No offers found in {preferred_currency}{quality_msg}.")
+    
+    except Exception as e:
+        st.error(f"❌ Error loading offers: {str(e)}")
 
 def search_discogs_offers(release, selected_release):
     """Search and display Discogs offers for selected release with updated scraper integration"""
@@ -662,7 +778,7 @@ def show_discogs_and_revibed_block(releases, track_for_search, revibed_results):
     with header_col1:
         st.markdown("#### Discogs Releases")
     with header_col2:
-        st.markdown("#### Offers in your currency")
+        st.markdown("#### Available offers in your currency")
     
     print(f"UI: Received {len(releases)} releases from API")
     for i, r in enumerate(releases[:3]):
@@ -684,7 +800,16 @@ def show_discogs_and_revibed_block(releases, track_for_search, revibed_results):
                 ),
                 key="release_select"
             )
-            st.session_state.release_selected_idx = selected_idx
+            
+            # Check if selection changed and trigger rerun
+            if selected_idx != st.session_state.get("release_selected_idx", 0):
+                st.session_state.release_selected_idx = selected_idx
+                # Reset offers display when changing selection
+                st.session_state.show_offers = False
+                st.session_state.offers_for_release = None
+                st.rerun()
+            else:
+                st.session_state.release_selected_idx = selected_idx
 
             # Cover and details for selected release
             if selected_idx < len(releases):
@@ -811,6 +936,7 @@ def show_discogs_and_revibed_block(releases, track_for_search, revibed_results):
                 if st.button("Search for Offers", key=search_button_key):
                     st.session_state.show_offers = True
                     st.session_state.offers_for_release = selected_idx
+                    st.rerun()
         st.markdown("---")
     else:
         st.image(NO_HIT_COVER, width=92)

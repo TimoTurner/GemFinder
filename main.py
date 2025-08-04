@@ -499,6 +499,12 @@ if search_clicked or track_search_clicked:
         live_container.empty()
         digital_container.empty()
         st.session_state.live_results = []
+        
+        # Reset live results containers for new search
+        if "live_results_containers" in st.session_state:
+            st.session_state.live_results_containers = {}
+        if "live_results_header_shown" in st.session_state:
+            st.session_state.live_results_header_shown = False
 
         # Stage 1: Search digital platforms if criteria met
         if can_search_digital:
@@ -550,8 +556,10 @@ if search_clicked or track_search_clicked:
             st.session_state.has_digital_hits = len(real_hits) > 0
 
             if st.session_state.has_digital_hits:
-                # Stage 1 complete: Show digital results with button for stage 2
-                live_container.empty()
+                # Stage 1 complete: Live results already shown, just clear progress and show mode switch
+                if "live_progress_container" in st.session_state:
+                    st.session_state.live_progress_container.empty()
+                
                 with digital_container:
                     show_digital_block()
             elif can_search_secondary:

@@ -2,86 +2,89 @@ import requests
 import time
 from functools import lru_cache
 
+# Global session for connection pooling - avoids Streamlit interference  
+_itunes_session = None
+
+def get_itunes_session():
+    """Get or create global iTunes session for connection pooling"""
+    global _itunes_session
+    if _itunes_session is None:
+        _itunes_session = requests.Session()
+        # Configure for fast connections
+        _itunes_session.timeout = 2
+        # Keep-alive and connection pooling
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=1,
+            pool_maxsize=1,
+            max_retries=0
+        )
+        _itunes_session.mount('https://', adapter)
+    return _itunes_session
+
 def get_itunes_release_info(artist, track):
-    """iTunes implementation with dummy data for test keywords"""
+    """iTunes API with test dummy and fallback error handling"""
     
-    print("Calling iTunes (with dummy data for test keywords)...")
-    time.sleep(0.1)  # Simulate API call delay
-    
-    # Check for test keywords that should return dummy data
-    artist_lower = artist.lower()
-    track_lower = track.lower()
-    
-    # Digital scenario test keywords
-    if artist.lower() in ["A", "a"] or track.lower() in ["A", "a"]:
+    try:
+        # Real iTunes API implementation
         
-        return {
-            "platform": "iTunes",
-            "title": track,
-            "artist": artist,
-            "album": f"{track} - Single",
-            "label": "iTunes Store",
-            "price": "€1.29",
-            "cover": "https://placehold.co/120x120/007AFF/white?text=iTunes",
-            "release_url": f"https://itunes.apple.com/track/{track.lower().replace(' ', '-')}",
-            "preview": f"https://audio-ssl.itunes.apple.com/preview/{track.lower().replace(' ', '-')}.m4a"
-        }
+        print("Calling iTunes API...")
+        t0 = time.time()
+        
+        query = f"{artist} {track}"
+        url = "https://itunes.apple.com/search"
+        params = {"term": query, "entity": "song", "limit": 1, "country": "DE"}
+        
+        session = get_itunes_session()
+        response = session.get(url, params=params, timeout=2)
+        print(f"iTunes API response: {time.time() - t0:.2f}s, Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("results"):
+                r = data["results"][0]
+                return {
+                    "platform": "iTunes",
+                    "title": r.get("trackName", ""),
+                    "artist": r.get("artistName", ""),
+                    "album": r.get("collectionName", ""),
+                    "label": "iTunes Store",
+                    "price": f"{r.get('trackPrice', '')} {r.get('currency', '')}" if r.get("trackPrice") else "",
+                    "cover": r.get("artworkUrl100", ""),
+                    "release_url": r.get("trackViewUrl", ""),
+                    "preview": r.get("previewUrl", "")
+                }
+        
+        # No results found
+        return {"platform": "iTunes", "title": "Kein Treffer", "artist": "", "album": "", "label": "", "price": "", "cover": "", "release_url": "", "preview": ""}
+        
+    except ImportError:
+        # Test dummy for development (can be commented out to test error handling)
+        print("Calling iTunes (with dummy data for test keywords)...")
+        time.sleep(0.1)  # Simulate API call delay
+        
+        # Digital scenario test keywords
+        if artist.lower() in ["A", "a"] or track.lower() in ["A", "a"]:
+            return {
+                "platform": "iTunes",
+                "title": track,
+                "artist": artist,
+                "album": f"{track} - Single",
+                "label": "iTunes Store",
+                "price": "€1.29",
+                "cover": "https://placehold.co/120x120/007AFF/white?text=iTunes",
+                "release_url": f"https://itunes.apple.com/track/{track.lower().replace(' ', '-')}",
+                "preview": f"https://audio-ssl.itunes.apple.com/preview/{track.lower().replace(' ', '-')}.m4a"
+            }
+        
+        # For all other cases, return "Kein Treffer"
+        return {"platform": "iTunes", "title": "Kein Treffer", "artist": "", "album": "", "label": "", "price": "", "cover": "", "release_url": "", "preview": ""}
     
-    # For all other cases, return "Kein Treffer"
-    return {"platform": "iTunes", "title": "Kein Treffer", "artist": "", "album": "", "label": "", "price": "", "cover": "", "release_url": "", "preview": ""}
+    except Exception as e:
+        print(f"❌ iTunes API error: {e}")
+        return {"platform": "iTunes", "title": "❌ iTunes Suche nicht verfügbar", "artist": "", "album": "", "label": "", "price": "", "cover": "", "release_url": "", "preview": ""}
 
-# REAL ITUNES API IMPLEMENTATION (COMMENTED OUT)
-# def get_itunes_release_info(artist, track):
-#     """Real iTunes API implementation"""
-#     
-#     print("Calling iTunes API...")
-#     t0 = time.time()
-#     
-#     query = f"{artist} {track}"
-#     url = "https://itunes.apple.com/search"
-#     params = {"term": query, "entity": "song", "limit": 1, "country": "DE"}
-#     
-#     try:
-#         response = requests.get(url, params=params, timeout=2)
-#         print(f"iTunes API response: {time.time() - t0:.2f}s, Status: {response.status_code}")
-#         
-#         if response.status_code == 200:
-#             data = response.json()
-#             if data.get("results"):
-#                 r = data["results"][0]
-#                 return {
-#                     "platform": "iTunes",
-#                     "title": r.get("trackName", ""),
-#                     "artist": r.get("artistName", ""),
-#                     "album": r.get("collectionName", ""),
-#                     "label": "iTunes Store",
-#                     "price": f"{r.get('trackPrice', '')} {r.get('currency', '')}" if r.get("trackPrice") else "",
-#                     "cover": r.get("artworkUrl100", ""),
-#                     "release_url": r.get("trackViewUrl", ""),
-#                     "preview": r.get("previewUrl", "")
-#                 }
-#     except Exception as e:
-#         print(f"iTunes API error: {e}")
-#     
-#     # No results found
-#     return {"platform": "iTunes", "title": "Kein Treffer", "artist": "", "album": "", "label": "", "price": "", "cover": "", "release_url": "", "preview": ""}                             
+# Old iTunes API implementation removed - now integrated into active function
 
-def get_discogs_release_info(catalog_number, artist, track, album):
-    offers = []
-    if "demo track b" in track.lower():
-        offers = [
-            {"seller": "VinylKing", "country": "Germany", "condition": "VG+", "price": "15", "currency": "EUR", "url": "https://discogs.com/demo-b-vgplus", "shipping": "5"},
-            {"seller": "Collector", "country": "Netherlands", "condition": "NM", "price": "19", "currency": "EUR", "url": "https://discogs.com/demo-b-nm", "shipping": "6"}
-        ]
-    return {
-        "offers": offers,
-        "album": album,
-        "artist": artist,
-        "tracklist": [track],
-        "want_have_ratio": "5/100",
-        "label": "Dummy Label",
-        "avg_price": "15.00"
-    }
 def search_discogs_releases(artist=None, track=None, album=None, catno=None):
     """Real Discogs API implementation"""
     import os
@@ -94,26 +97,13 @@ def search_discogs_releases(artist=None, track=None, album=None, catno=None):
     except ImportError:
         pass
     
+    # Discogs database/search API now requires authentication (since 2024)
     DISCOGS_USER_TOKEN = os.environ.get("DISCOGS_USER_TOKEN")
     
     if not DISCOGS_USER_TOKEN:
-        print("⚠️ DISCOGS_USER_TOKEN not found - using fallback dummy")
-        # Fallback to basic dummy data if no token
-        if not (artist or track or album or catno):
-            return []
-        return [{
-            "id": "1",
-            "cover": "https://placehold.co/120x120/FF9F43/white?text=NoToken",
-            "thumb": "https://placehold.co/60x60/FF9F43/white?text=NoToken",
-            "title": f"{track or album or 'No Token'}",
-            "artist": artist or "Configure Token",
-            "tracklist": [track] if track else [],
-            "label": ["Set DISCOGS_USER_TOKEN"],
-            "year": "2024",
-            "format": ["Unknown"],
-            "catno": catno or "TOKEN-001",
-            "uri": "/release/1"
-        }]
+        print("❌ Discogs API error: Authentication required")
+        print("   The Discogs database search API now requires a user token")
+        return []
     
     # Build search query - Discogs API works better with simple terms
     query_parts = []
@@ -209,7 +199,7 @@ def search_discogs_releases(artist=None, track=None, album=None, catno=None):
         else:
             print(f"Discogs API error: {response.status_code}")
             if response.status_code == 401:
-                print("Authentication failed - check DISCOGS_USER_TOKEN")
+                print("Discogs API authentication error - API may be restricted")
             elif response.status_code == 429:
                 print("Rate limit exceeded - wait and try again")
             try:
@@ -239,15 +229,15 @@ def get_discogs_release_details(release_id):
     DISCOGS_USER_TOKEN = os.environ.get("DISCOGS_USER_TOKEN")
     
     if not DISCOGS_USER_TOKEN:
-        print("⚠️ DISCOGS_USER_TOKEN not found - using fallback")
+        print("❌ Discogs API error: Authentication required")
         return {
             "id": release_id,
-            "title": "Configure Token",
-            "tracklist": [{"position": "1", "title": "Set DISCOGS_USER_TOKEN", "duration": "0:00"}],
-            "label": ["No Token"],
-            "year": "2024",
+            "title": f"Release {release_id}",
+            "tracklist": [],
+            "label": ["Unknown"],
+            "year": "",
             "format": ["Unknown"],
-            "cover": "https://placehold.co/120x120/FF9F43/white?text=NoToken"
+            "cover": ""
         }
     
     try:
@@ -300,75 +290,16 @@ def get_discogs_release_details(release_id):
     }
 
 def get_discogs_offers(release_id, currency="EUR", country="DE"):
-    """Real Discogs Marketplace API implementation with location-based shipping"""
-    import os
-    import requests
-    from dotenv import load_dotenv
+    """
+    DEPRECATED: Discogs Marketplace API is not publicly available.
     
-    # Load environment variables
-    try:
-        load_dotenv()
-    except ImportError:
-        pass
+    This function was based on the assumption that Discogs provides a marketplace API,
+    but research shows that Discogs discontinued/never provided public access to 
+    marketplace listings via API. Web scraping is the only option.
     
-    DISCOGS_USER_TOKEN = os.environ.get("DISCOGS_USER_TOKEN")
-    
-    if not DISCOGS_USER_TOKEN:
-        print("⚠️ DISCOGS_USER_TOKEN not found - using fallback")
-        return []
-    
-    try:
-        url = "https://api.discogs.com/marketplace/search"
-        headers = {
-            "Authorization": f"Discogs token={DISCOGS_USER_TOKEN}",
-            "User-Agent": "GemFinderApp/1.0"
-        }
-        params = {
-            "release_id": release_id,
-            "currency": currency,
-            "country": country,  # Add country for location-based shipping
-            "per_page": 25
-        }
-        
-        print(f"Getting Discogs marketplace offers for release: {release_id}")
-        response = requests.get(url, headers=headers, params=params, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            offers = data.get("results", [])
-            
-            # Format offers for UI - properly handle price structure
-            formatted_offers = []
-            for offer in offers:
-                # Extract price information
-                price_obj = offer.get("price", {})
-                price_value = price_obj.get("value", 0) if isinstance(price_obj, dict) else 0
-                price_currency = price_obj.get("currency", "EUR") if isinstance(price_obj, dict) else "EUR"
-                
-                # Extract shipping information  
-                shipping_obj = offer.get("shipping_price", {})
-                shipping_value = shipping_obj.get("value", 0) if isinstance(shipping_obj, dict) else 0
-                shipping_currency = shipping_obj.get("currency", price_currency) if isinstance(shipping_obj, dict) else price_currency
-                
-                formatted_offers.append({
-                    "seller": offer.get("seller", {}).get("username", "Unknown"),
-                    "ships_from": offer.get("ships_from", "Unknown"),
-                    "condition": offer.get("condition", "Unknown"),
-                    "price": f"{price_value} {price_currency}" if price_value > 0 else "0.00 EUR",
-                    "shipping": f"{shipping_value} {shipping_currency}" if shipping_value > 0 else "Free",
-                    "country": offer.get("ships_from", "Unknown"),
-                    "offer_url": f"https://www.discogs.com{offer.get('uri', '')}" if offer.get('uri') else "",
-                    "seller_rating": f"{offer.get('seller', {}).get('stats', {}).get('rating', 'N/A')}%"
-                })
-            
-            return formatted_offers
-        else:
-            print(f"Discogs Marketplace API error: {response.status_code}")
-            
-    except Exception as e:
-        print(f"Discogs Marketplace API error: {e}")
-    
-    # Return empty list if API fails
+    Returns empty list to maintain compatibility.
+    """
+    print("⚠️ Discogs Marketplace API is not available - use web scraping instead")
     return []
 
 ##################################################################Dummy Ende

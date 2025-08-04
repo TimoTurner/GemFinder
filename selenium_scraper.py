@@ -36,12 +36,13 @@ def create_selenium_driver(headless: bool = True, aggressive: bool = True) -> we
     options.add_argument('--disable-backgrounding-occluded-windows')
     options.add_argument('--disable-ipc-flooding-protection')
     
-    # Disable unnecessary features for speed
+    # Disable unnecessary features for speed (less aggressive)
     options.add_argument('--disable-extensions')
     options.add_argument('--disable-plugins')
-    options.add_argument('--disable-images')  # Don't load images for faster loading
-    options.add_argument('--disable-javascript')  # We only need HTML structure
-    options.add_argument('--disable-css')  # Don't need CSS styling
+    # Keep JavaScript and CSS enabled for proper page functionality
+    # options.add_argument('--disable-images')  # Keep images for now
+    # options.add_argument('--disable-javascript')  # Keep JS enabled
+    # options.add_argument('--disable-css')  # Keep CSS enabled
     
     # Anti-detection measures (minimal)
     options.add_argument('--disable-blink-features=AutomationControlled')

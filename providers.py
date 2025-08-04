@@ -1,7 +1,7 @@
 # providers.py
 from abc import ABC, abstractmethod
 from scrape_search import search_bandcamp, search_beatport, search_traxsource, search_revibed
-from api_search import get_itunes_release_info, search_discogs_releases, get_discogs_release_details, get_discogs_offers
+from api_search import get_itunes_release_info, search_discogs_releases, get_discogs_release_details
 
 class SearchCriteria:
     def __init__(self, title: str = "", artist: str = "", album: str = "", catalog: str = ""):

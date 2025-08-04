@@ -9,10 +9,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api_search import (
     get_itunes_release_info,
-    get_discogs_release_info,
     search_discogs_releases,
-    get_discogs_release_details,
-    get_discogs_offers
+    get_discogs_release_details
+    # get_discogs_offers  # DEPRECATED - Marketplace API not available
 )
 
 
@@ -66,41 +65,7 @@ class TestGetItunesReleaseInfo:
         assert result["preview"] == ""
 
 
-class TestGetDiscogsReleaseInfo:
-    """Test Discogs release info retrieval."""
-    
-    def test_demo_track_b_offers(self):
-        """Test Discogs returns offers for 'demo track b'."""
-        result = get_discogs_release_info("CAT123", "artist", "demo track b", "album")
-        
-        assert "offers" in result
-        assert len(result["offers"]) == 2
-        
-        # Check first offer
-        first_offer = result["offers"][0]
-        assert first_offer["seller"] == "VinylKing"
-        assert first_offer["country"] == "Germany"
-        assert first_offer["condition"] == "VG+"
-        assert first_offer["price"] == "15"
-        assert first_offer["currency"] == "EUR"
-        
-        # Check second offer
-        second_offer = result["offers"][1]
-        assert second_offer["seller"] == "Collector"
-        assert second_offer["condition"] == "NM"
-        assert second_offer["price"] == "19"
-    
-    def test_other_tracks_no_offers(self):
-        """Test Discogs returns empty offers for other tracks."""
-        result = get_discogs_release_info("CAT123", "artist", "other track", "album")
-        
-        assert result["offers"] == []
-        assert result["album"] == "album"
-        assert result["artist"] == "artist"
-        assert result["tracklist"] == ["other track"]
-        assert result["want_have_ratio"] == "5/100"
-        assert result["label"] == "Dummy Label"
-        assert result["avg_price"] == "15.00"
+# TestGetDiscogsReleaseInfo class removed - function was deprecated and deleted
 
 
 class TestSearchDiscogsReleases:
@@ -162,16 +127,11 @@ class TestGetDiscogsReleaseDetails:
 class TestGetDiscogsOffers:
     """Test Discogs offers retrieval."""
     
-    def test_get_offers_structure(self):
-        """Test that offers function returns expected structure."""
-        # This would be mocked in real implementation
-        # For now, just test it doesn't crash
-        try:
-            result = get_discogs_offers("123456")
-            assert isinstance(result, (list, type(None)))
-        except Exception:
-            # Expected since this likely requires real API calls
-            pass
+    # DEPRECATED: get_discogs_offers test removed - Marketplace API not available
+    # def test_get_offers_structure(self):
+    #     """Test that offers function returns expected structure."""
+    #     # Discogs Marketplace API is not publicly available - web scraping only option
+    #     pass
 
 
 class TestApiSearchIntegration:
@@ -181,10 +141,9 @@ class TestApiSearchIntegration:
         """Test that all API search functions can be imported."""
         from api_search import (
             get_itunes_release_info,
-            get_discogs_release_info,
             search_discogs_releases,
-            get_discogs_release_details,
-            get_discogs_offers
+            get_discogs_release_details
+            # get_discogs_offers  # DEPRECATED - Marketplace API not available
         )
         
         # If we got here, all imports succeeded

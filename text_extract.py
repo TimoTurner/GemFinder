@@ -22,9 +22,8 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 def extract_text_from_image(uploaded_file):
     """Real OCR implementation using OpenAI GPT-4 Vision"""
     if not OPENAI_API_KEY:
-        print("⚠️ OPENAI_API_KEY not found - using dummy OCR")
-        time.sleep(1)
-        return "Künstler: Example Artist\nAlbum: Demo Album\nDemo Track A\nDemo Track B\nLabel: Demo Label\nKatalognummer: DEMO-001"
+        print("❌ OCR nicht verfügbar: OpenAI API-Schlüssel fehlt")
+        return "❌ Texterkennung nicht verfügbar\n\nUm Bilder automatisch zu analysieren, wird ein OpenAI API-Schlüssel benötigt.\nBitte geben Sie die Informationen manuell ein."
     
     try:
         client = OpenAI(api_key=OPENAI_API_KEY)
@@ -59,22 +58,13 @@ def extract_text_from_image(uploaded_file):
         
     except Exception as e:
         print(f"❌ OpenAI OCR error: {e}")
-        # Fallback to dummy
-        time.sleep(1)
-        return "Künstler: Example Artist\nAlbum: Demo Album\nDemo Track A\nDemo Track B\nLabel: Demo Label\nKatalognummer: DEMO-001"
+        return "❌ Texterkennung fehlgeschlagen\n\nDie automatische Bilderkennung ist momentan nicht verfügbar.\nBitte geben Sie die Informationen manuell ein."
 
 def analyze_text_with_gpt4(extracted_text, mode_context=None):
     """Real text analysis using OpenAI GPT-4"""
     if not OPENAI_API_KEY:
-        print("⚠️ OPENAI_API_KEY not found - using dummy analysis")
-        time.sleep(0.5)
-        # Return test scenario data based on mode_context
-        if mode_context == 'camera':
-            return ("vinyl artist", "rare vinyl album", ["rare track", "vinyl mix"], "Vinyl Records", "VIN-001")
-        elif mode_context == 'upload':
-            return ("discogs artist", "catalog collection", ["vintage track", "catalog mix"], "Catalog Records", "catalog-123")
-        else:
-            return ("Swag", "Demo Album", ["Pina", "Track B"], "Demo Label", "DEMO-001")
+        print("❌ Textanalyse nicht verfügbar: OpenAI API-Schlüssel fehlt")
+        return ("", "", ["❌ Automatische Analyse nicht verfügbar"], "", "")
     
     try:
         client = OpenAI(api_key=OPENAI_API_KEY)
@@ -122,14 +112,7 @@ def analyze_text_with_gpt4(extracted_text, mode_context=None):
         
     except Exception as e:
         print(f"❌ OpenAI analysis error: {e}")
-        # Fallback to dummy data
-        time.sleep(0.5)
-        if mode_context == 'camera':
-            return ("vinyl artist", "rare vinyl album", ["rare track", "vinyl mix"], "Vinyl Records", "VIN-001")
-        elif mode_context == 'upload':
-            return ("discogs artist", "catalog collection", ["vintage track", "catalog mix"], "Catalog Records", "catalog-123")
-        else:
-            return ("", "", [""], "", "")
+        return ("", "", ["❌ Textanalyse fehlgeschlagen"], "", "")
 
 def downscale_image(image_bytes, max_side=1000):
     """Downscale image to reduce API costs"""

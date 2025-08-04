@@ -582,116 +582,235 @@ def display_single_offer_clean(offer, index, preferred_currency, selected_releas
                        unsafe_allow_html=True)
 
 def show_live_results():
-    pass
+    """Display live search results as they come in from parallel threads"""
+    import streamlit as st
+    
+    live_results = st.session_state.get("live_results", [])
+    
+    if not live_results:
+        st.info("🔍 Starting search...")
+        return
+    
+    # Show progress bar with platform status
+    platform_status = {}
+    total_platforms = 4  # iTunes, Beatport, Bandcamp, Traxsource
+    
+    for result in live_results:
+        platform = result.get("platform", "Unknown")
+        title = result.get("title", "")
+        
+        # Check if this is a real result or error
+        if title.lower() in ["kein treffer", "fehler", "", "❌ fehler"]:
+            platform_status[platform] = "❌"
+        elif "nicht verfügbar" in title.lower():
+            platform_status[platform] = "⚠️"
+        else:
+            platform_status[platform] = "✅"
+    
+    # Build progress string
+    progress_parts = []
+    for platform in ["iTunes", "Beatport", "Bandcamp", "Traxsource"]:
+        status = platform_status.get(platform, "⏳")
+        progress_parts.append(f"{platform} {status}")
+    
+    progress_text = ", ".join(progress_parts)
+    
+    # Use single persistent progress display
+    if "live_progress_container" not in st.session_state:
+        st.session_state.live_progress_container = st.empty()
+    
+    with st.session_state.live_progress_container.container():
+        st.info(f"🔍 Searching: {progress_text}")
+        
+        completed_count = len([p for p in platform_status.values() if p in ["✅", "❌", "⚠️"]])
+        if completed_count > 0:
+            st.progress(completed_count / total_platforms)
+    
+    # Show digital results immediately as they come in (each platform only once)
+    PLACEHOLDER_COVER = "cover_placeholder.png"
+    NO_HIT_COVER = "not_found.png"
+    
+    # Initialize containers for each platform if not exists
+    if "live_results_containers" not in st.session_state:
+        st.session_state.live_results_containers = {}
+        st.session_state.live_results_header_shown = False
+    
+    # Show header only once
+    if live_results and not st.session_state.live_results_header_shown:
+        st.markdown("#### Digital Results")
+        st.session_state.live_results_header_shown = True
+    
+    # Display only NEW results (not already displayed)
+    displayed_platforms = set(st.session_state.live_results_containers.keys())
+    
+    for entry in live_results:
+        platform_str = entry.get("platform", "")
+        
+        # Skip if this platform was already displayed
+        if platform_str in displayed_platforms:
+            continue
+            
+        # Create container for this platform
+        st.session_state.live_results_containers[platform_str] = st.empty()
+        
+        # Display this platform's result
+        with st.session_state.live_results_containers[platform_str].container():
+            title_str = str(entry.get("title", ""))
+            artist_str = str(entry.get("artist", ""))
+            album_str = str(entry.get("album", ""))
+            label_raw = entry.get("label", "")
+            label_str = label_raw[0] if isinstance(label_raw, list) and label_raw else str(label_raw)
+            price_str = str(entry.get("price", ""))
+            cover_url = entry.get("cover_url", "") or entry.get("cover", "")
+            release_url = entry.get("url", "").strip()
+            
+            # Image selection - show NO_HIT_COVER for no results, PLACEHOLDER for valid results without cover
+            is_real_hit = is_valid_result(entry, check_empty_title=False)
+            if not cover_url or not cover_url.strip():
+                cover_url = PLACEHOLDER_COVER if is_real_hit else NO_HIT_COVER
+            
+            # Display result
+            cols = st.columns([1, 5])
+            with cols[0]:
+                st.image(cover_url, width=92)
+            with cols[1]:
+                if release_url:
+                    st.markdown(f"[**{platform_str}**]({release_url})")
+                else:
+                    from utils import get_platform_info
+                    platform_url, _ = get_platform_info(platform_str)
+                    st.markdown(f"[**{platform_str}**]({platform_url})")
+                
+                st.markdown(f"**{title_str}**")
+                if artist_str:
+                    st.markdown(f"{artist_str}")
+                if album_str:
+                    st.markdown(f"*{album_str}*")
+                if label_str:
+                    st.markdown(f"`{label_str}`")
+                if price_str and release_url:
+                    st.markdown(f"[{price_str}]({release_url})")
+                elif price_str:
+                    st.markdown(f":green[{price_str}]")
+                
+                # iTunes preview only for valid hits
+                if platform_str == "iTunes" and entry.get("preview") and is_real_hit:
+                    st.audio(entry["preview"], format="audio/mp4")
+            
+            st.markdown("---")
 
 
 def show_digital_block():
-    PLACEHOLDER_COVER = "cover_placeholder.png"   # neutrales Bild
-    NO_HIT_COVER     = "not_found.png"            # durchgestrichenes Bild
+    # FUNCTION DISABLED: This entire function creates duplicate digital results display
+    # The "Digital Results (Live)" section is already shown elsewhere
+    # Keeping function definition to avoid breaking imports
+    pass
+    
+    # COMMENTED OUT: Original duplicate display code
+    # PLACEHOLDER_COVER = "cover_placeholder.png"   # neutrales Bild
+    # NO_HIT_COVER     = "not_found.png"            # durchgestrichenes Bild
+    # 
+    # all_results = st.session_state.results_digital
+    # user_track  = st.session_state.track_for_search.strip()
 
-    all_results = st.session_state.results_digital
-    user_track  = st.session_state.track_for_search.strip()
-
-    st.markdown("#### Digital results")
-
-    # Use unified hit detection
-    def is_real_hit(entry):
-        return is_valid_result(entry, check_empty_title=False)
-
+    # # Use unified hit detection
+    # def is_real_hit(entry):
+    #     return is_valid_result(entry, check_empty_title=False)
+    # 
+    # # real_hits = [
+    # #     entry for entry in all_results
+    # #     if is_real_hit(entry) and entry.get("platform","").lower() != "itunes"
+    # # ]
     # real_hits = [
-    #     entry for entry in all_results
-    #     if is_real_hit(entry) and entry.get("platform","").lower() != "itunes"
+    #     r for r in st.session_state.results_digital
+    #     if (r.get("title") or "").strip().lower() not in ("kein treffer", "", "fehler")
     # ]
-    real_hits = [
-        r for r in st.session_state.results_digital
-        if (r.get("title") or "").strip().lower() not in ("kein treffer", "", "fehler")
-    ]
-
-    any_hit = len(real_hits) > 0
-
-    # Display all digital results in order of availability
-    for entry in all_results:
-        platform_str = entry.get("platform", "")
-        title_str    = str(entry.get("title", ""))
-        artist_str   = str(entry.get("artist", ""))
-        album_str    = str(entry.get("album", ""))
-        label_raw    = entry.get("label", "")
-        label_str    = label_raw[0] if isinstance(label_raw, list) and label_raw else str(label_raw)
-        price_str    = str(entry.get("price", ""))
-        cover_url    = entry.get("cover_url", "") or entry.get("cover", "")
-        release_url  = entry.get("url", "").strip()
-        platform_url, _ = get_platform_info(platform_str)
-
-        # Bildauswahl
-        if not cover_url or not cover_url.strip():
-            cover_url = NO_HIT_COVER if not is_real_hit(entry) else PLACEHOLDER_COVER
-
-        # Fuzzy Matching für Beatport
-        highlight = (platform_str == "Beatport" and is_fuzzy_match(user_track, title_str))
-
-        cols = st.columns([1, 5])
-        with cols[0]:
-            st.image(cover_url, width=92)
-        with cols[1]:
-            if release_url:
-                st.markdown(f"[**{platform_str}**]({release_url})", unsafe_allow_html=True)
-            else:
-                st.markdown(f"[**{platform_str}**]({platform_url})", unsafe_allow_html=True)
-
-            if highlight:
-                st.markdown(f":red[**{title_str}**]")
-            else:
-                st.markdown(f"**{title_str}**")
-
-            if artist_str:
-                st.markdown(f"{artist_str}")
-            if album_str:
-                st.markdown(f"*{album_str}*")
-            if label_str:
-                st.markdown(f"`{label_str}`")
-            if price_str and release_url:
-                st.markdown(f"[{price_str}]({release_url})", unsafe_allow_html=True)
-            elif price_str:
-                st.markdown(f":green[{price_str}]")
-            if platform_str == "iTunes" and entry.get("preview") and is_real_hit(entry):
-                st.audio(entry["preview"], format="audio/mp4")
-
-        st.markdown("---")
-
-    # Only show mode switch button when there are digital hits
-    if any_hit:
-        # Button logic: search vs switch mode
-        if not st.session_state.get("secondary_search_done", False):
-            # First time clicking - perform search
-            if st.button("Search on Discogs and Revibed", key="discogs_search_digital"):
-                st.session_state.discogs_revibed_mode = True
-                st.session_state.show_digital         = False
-                artist  = st.session_state.artist_input.strip()
-                album   = st.session_state.album_input.strip()
-                track   = st.session_state.track_for_search.strip()
-                
-                # Search is now handled by provider system in main.py
-                # st.session_state.results_discogs will be set by DiscogsProvider
-                if album:
-                    st.session_state.results_revibed = search_revibed('', album)
-                elif artist:
-                    st.session_state.results_revibed = search_revibed(artist, '')
-                else:
-                    st.session_state.results_revibed = [{
-                        'platform': 'Revibed',
-                        'title':'','artist':'','album':'','label':'','price':'',
-                        'cover_url':'','url':'','search_time':0.0,
-                        'message': "Für Revibed-Suche mindestens Album ODER Artist ausfüllen."
-                    }]
-                
-                st.session_state.secondary_search_done = True
-                st.rerun()
-        else:
-            # Search already done - just switch view
-            if st.button("Zu Discogs und Revibed wechseln", key="switch_to_secondary"):
-                st.session_state.discogs_revibed_mode = True
-                st.session_state.show_digital         = False
-                st.rerun()
+    # 
+    # any_hit = len(real_hits) > 0
+    # 
+    # # Display all digital results in order of availability
+    # for entry in all_results:
+    #     platform_str = entry.get("platform", "")
+    #     title_str    = str(entry.get("title", ""))
+    #     artist_str   = str(entry.get("artist", ""))
+    #     album_str    = str(entry.get("album", ""))
+    #     label_raw    = entry.get("label", "")
+    #     label_str    = label_raw[0] if isinstance(label_raw, list) and label_raw else str(label_raw)
+    #     price_str    = str(entry.get("price", ""))
+    #     cover_url    = entry.get("cover_url", "") or entry.get("cover", "")
+    #     release_url  = entry.get("url", "").strip()
+    #     platform_url, _ = get_platform_info(platform_str)
+    # 
+    #     # Bildauswahl
+    #     if not cover_url or not cover_url.strip():
+    #         cover_url = NO_HIT_COVER if not is_real_hit(entry) else PLACEHOLDER_COVER
+    # 
+    #     # Fuzzy Matching für Beatport
+    #     highlight = (platform_str == "Beatport" and is_fuzzy_match(user_track, title_str))
+    # 
+    #     cols = st.columns([1, 5])
+    #     with cols[0]:
+    #         st.image(cover_url, width=92)
+    #     with cols[1]:
+    #         if release_url:
+    #             st.markdown(f"[**{platform_str}**]({release_url})", unsafe_allow_html=True)
+    #         else:
+    #             st.markdown(f"[**{platform_str}**]({platform_url})", unsafe_allow_html=True)
+    # 
+    #         if highlight:
+    #             st.markdown(f":red[**{title_str}**]")
+    #         else:
+    #             st.markdown(f"**{title_str}**]")
+    # 
+    #         if artist_str:
+    #             st.markdown(f"{artist_str}")
+    #         if album_str:
+    #             st.markdown(f"*{album_str}*")
+    #         if label_str:
+    #             st.markdown(f"`{label_str}`")
+    #         if price_str and release_url:
+    #             st.markdown(f"[{price_str}]({release_url})", unsafe_allow_html=True)
+    #         elif price_str:
+    #             st.markdown(f":green[{price_str}]")
+    #         if platform_str == "iTunes" and entry.get("preview") and is_real_hit(entry):
+    #             st.audio(entry["preview"], format="audio/mp4")
+    # 
+    #     st.markdown("---")
+    # 
+    # # Only show mode switch button when there are digital hits
+    # if any_hit:
+    #     # Button logic: search vs switch mode
+    #     if not st.session_state.get("secondary_search_done", False):
+    #         # First time clicking - perform search
+    #         if st.button("Search on Discogs and Revibed", key="discogs_search_digital"):
+    #             st.session_state.discogs_revibed_mode = True
+    #             st.session_state.show_digital         = False
+    #             artist  = st.session_state.artist_input.strip()
+    #             album   = st.session_state.album_input.strip()
+    #             track   = st.session_state.track_for_search.strip()
+    #             
+    #             # Search is now handled by provider system in main.py
+    #             # st.session_state.results_discogs will be set by DiscogsProvider
+    #             if album:
+    #                 st.session_state.results_revibed = search_revibed('', album)
+    #             elif artist:
+    #                 st.session_state.results_revibed = search_revibed(artist, '')
+    #             else:
+    #                 st.session_state.results_revibed = [{
+    #                     'platform': 'Revibed',
+    #                     'title':'','artist':'','album':'','label':'','price':'',
+    #                     'cover_url':'','url':'','search_time':0.0,
+    #                     'message': "Für Revibed-Suche mindestens Album ODER Artist ausfüllen."
+    #                 }]
+    #             
+    #             st.session_state.secondary_search_done = True
+    #             st.rerun()
+    #     else:
+    #         # Search already done - just switch view
+    #         if st.button("Zu Discogs und Revibed wechseln", key="switch_to_secondary"):
+    #             st.session_state.discogs_revibed_mode = True
+    #             st.session_state.show_digital         = False
+    #             st.rerun()
 
 # Create intensity-based colors for Have/Want like Discogs
 def get_intensity_color(count, color_type):

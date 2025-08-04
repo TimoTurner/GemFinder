@@ -2,7 +2,132 @@ import requests
 import time
 from functools import lru_cache
 
-# iTunes implementation removed - will be added back cleanly
+# iTunes functions will be reimplemented from scratch
+    """Get or create global iTunes session for connection pooling"""
+    global _itunes_session
+    if _itunes_session is None:
+        print("🔧 Creating new iTunes session with optimized connection pool")
+        _itunes_session = requests.Session()
+        # Configure for fast connections
+        # Keep-alive and connection pooling - optimized for parallel requests
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=5,   # Support multiple concurrent connections
+            pool_maxsize=10,     # Larger pool for better parallel performance
+            max_retries=1        # Allow one retry for reliability
+        )
+        _itunes_session.mount('https://', adapter)
+        _itunes_session.headers.update({
+            'User-Agent': 'GemFinder/1.0',
+            'Accept': 'application/json'
+        })
+        print("✅ iTunes session configured with connection pooling")
+    else:
+        print("♻️ Reusing existing iTunes session")
+    return _itunes_session
+
+def get_itunes_release_info(artist, track):
+    """iTunes API with test dummy and fallback error handling"""
+    
+    try:
+        # Real iTunes API implementation
+        print(f"🎵 iTunes API search: '{artist}' - '{track}'")
+        t0 = time.time()
+        
+        query = f"{artist} {track}"
+        url = "https://itunes.apple.com/search"
+        params = {"term": query, "entity": "song", "limit": 1, "country": "DE"}
+        
+        t1 = time.time()
+        print(f"⏱️ Setup time: {t1-t0:.3f}s")
+        
+        # Test DNS lookup first
+        import socket
+        dns_start = time.time()
+        try:
+            ip = socket.gethostbyname('itunes.apple.com')
+            dns_time = time.time() - dns_start
+            print(f"🌐 DNS lookup: {dns_time:.3f}s -> {ip}")
+        except Exception as e:
+            dns_time = time.time() - dns_start
+            print(f"❌ DNS error: {dns_time:.3f}s - {e}")
+        
+        session = get_itunes_session()
+        t2 = time.time()
+        print(f"⏱️ Session get time: {t2-t1:.3f}s")
+        
+        # DEBUG: Test different HTTP methods to isolate the issue
+        print("🔧 Environment debugging")
+        import os
+        print(f"HTTP_PROXY: {os.environ.get('HTTP_PROXY', 'None')}")
+        print(f"HTTPS_PROXY: {os.environ.get('HTTPS_PROXY', 'None')}")
+        print(f"NO_PROXY: {os.environ.get('NO_PROXY', 'None')}")
+        
+        # Try simple connection test first
+        import socket
+        sock_start = time.time()
+        try:
+            with socket.create_connection(('itunes.apple.com', 443), timeout=2) as sock:
+                sock_time = time.time() - sock_start
+                print(f"🔌 Raw socket connect: {sock_time:.3f}s")
+        except Exception as e:
+            sock_time = time.time() - sock_start
+            print(f"❌ Socket error: {sock_time:.3f}s - {e}")
+        
+        # Use requests as before
+        response = session.get(url, params=params, timeout=2)
+            
+        t3 = time.time()
+        print(f"⏱️ HTTP request time: {t3-t2:.3f}s")
+        
+        elapsed = time.time() - t0
+        print(f"✅ iTunes API response: {elapsed:.3f}s, Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("results"):
+                r = data["results"][0]
+                return {
+                    "platform": "iTunes",
+                    "title": r.get("trackName", ""),
+                    "artist": r.get("artistName", ""),
+                    "album": r.get("collectionName", ""),
+                    "label": "iTunes Store",
+                    "price": f"{r.get('trackPrice', '')} {r.get('currency', '')}" if r.get("trackPrice") else "",
+                    "cover": r.get("artworkUrl100", ""),
+                    "release_url": r.get("trackViewUrl", ""),
+                    "preview": r.get("previewUrl", "")
+                }
+        
+        # No results found
+        return {"platform": "iTunes", "title": "Kein Treffer", "artist": "", "album": "", "label": "", "price": "", "cover": "", "release_url": "", "preview": ""}
+        
+    except ImportError:
+        # Test dummy for development (can be commented out to test error handling)
+        print("Calling iTunes (with dummy data for test keywords)...")
+        time.sleep(0.1)  # Simulate API call delay
+        
+        # Digital scenario test keywords
+        if artist.lower() in ["A", "a"] or track.lower() in ["A", "a"]:
+            return {
+                "platform": "iTunes",
+                "title": track,
+                "artist": artist,
+                "album": f"{track} - Single",
+                "label": "iTunes Store",
+                "price": "€1.29",
+                "cover": "https://placehold.co/120x120/007AFF/white?text=iTunes",
+                "release_url": f"https://itunes.apple.com/track/{track.lower().replace(' ', '-')}",
+                "preview": f"https://audio-ssl.itunes.apple.com/preview/{track.lower().replace(' ', '-')}.m4a"
+            }
+        
+        # For all other cases, return "Kein Treffer"
+        return {"platform": "iTunes", "title": "Kein Treffer", "artist": "", "album": "", "label": "", "price": "", "cover": "", "release_url": "", "preview": ""}
+    
+    except Exception as e:
+        print(f"❌ iTunes API error: {e}")
+        return {"platform": "iTunes", "title": "❌ iTunes Suche nicht verfügbar", "artist": "", "album": "", "label": "", "price": "", "cover": "", "release_url": "", "preview": ""}
+
+# Old iTunes API implementation removed - now integrated into active function
 
 def search_discogs_releases(artist=None, track=None, album=None, catno=None):
     """Real Discogs API implementation"""
@@ -299,4 +424,33 @@ def get_discogs_offers(release_id, currency="EUR", country="DE"):
 #         print(f"Discogs API Error: {e}")
 #     return {}
 
-# Old commented iTunes code removed
+# #############itunes results können noch mit fuzzymatching verbessert werden 
+
+# def get_itunes_release_info(artist, track):
+#     print("get_itunes_release_info AUFRUFEN")
+#     import requests
+#     import time
+#     t0 = time.time()
+#     print("Starte iTunes-Request")
+#     query = f"{artist} {track}"
+#     url = "https://itunes.apple.com/search"
+#     params = {"term": query, "entity": "song", "limit": 1, "country": "DE"}
+#     try:
+#         response = requests.get(url, params=params, timeout=3)
+#         print("Antwort iTunes:", time.time() - t0, "Sekunden", response.status_code)
+#         if response.status_code == 200:
+#             data = response.json()
+#             if data.get("results"):
+#                 r = data["results"][0]
+#                 return {
+#                     "release_url": r.get("trackViewUrl", ""),
+#                     "cover": r.get("artworkUrl100", ""),
+#                     "title": r.get("trackName", ""),
+#                     "artist": r.get("artistName", ""),
+#                     "preview": r.get("previewUrl", ""),
+#                     "price": f"{r.get('trackPrice','')} {r.get('currency','')}" if r.get("trackPrice") else "",
+#                     "price_url": r.get("trackViewUrl", "")
+#                 }
+#     except Exception as e:
+#         print("Fehler bei iTunes-API:", e)
+#     return {}

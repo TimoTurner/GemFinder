@@ -4,7 +4,7 @@ import streamlit as st
 from scrape_search import search_revibed, scrape_discogs_marketplace_offers
 from selenium_scraper import selenium_filter_offers_parallel
 # Passe den Import-Pfad hier an, je nachdem wo du get_platform_info und is_fuzzy_match definiert hast:
-from api_search import get_itunes_release_info, search_discogs_releases, get_discogs_release_details, get_discogs_offers
+from api_search import search_discogs_releases, get_discogs_release_details, get_discogs_offers
 from utils import (get_platform_info, is_fuzzy_match, CURRENCY_MAPPING, 
                    CONDITION_HIERARCHY, HIGH_QUALITY_CONDITIONS, parse_price)
 import requests
@@ -587,13 +587,22 @@ def show_live_results():
     
     live_results = st.session_state.get("live_results", [])
     
-    if not live_results:
-        st.info("🔍 Starting search...")
+    # Always show progress bar when search is started, even with no results yet
+    if not live_results and st.session_state.get("suche_gestartet", False):
+        # Use single persistent progress display
+        if "live_progress_container" not in st.session_state:
+            st.session_state.live_progress_container = st.empty()
+        
+        with st.session_state.live_progress_container.container():
+            st.info("🔍 Starting search...")
+            st.progress(0)  # Show 0% progress bar immediately
+        return
+    elif not live_results:
         return
     
     # Show progress bar with platform status
     platform_status = {}
-    total_platforms = 4  # iTunes, Beatport, Bandcamp, Traxsource
+    total_platforms = 3  # Beatport, Bandcamp, Traxsource (iTunes will be re-added)
     
     for result in live_results:
         platform = result.get("platform", "Unknown")
@@ -609,7 +618,7 @@ def show_live_results():
     
     # Build progress string
     progress_parts = []
-    for platform in ["iTunes", "Beatport", "Bandcamp", "Traxsource"]:
+    for platform in ["Beatport", "Bandcamp", "Traxsource"]:
         status = platform_status.get(platform, "⏳")
         progress_parts.append(f"{platform} {status}")
     
@@ -693,8 +702,8 @@ def show_live_results():
                 elif price_str:
                     st.markdown(f":green[{price_str}]")
                 
-                # iTunes preview only for valid hits
-                if platform_str == "iTunes" and entry.get("preview") and is_real_hit:
+                # Preview functionality (will be re-added with iTunes)
+                if entry.get("preview") and is_real_hit:
                     st.audio(entry["preview"], format="audio/mp4")
             
             st.markdown("---")
@@ -772,7 +781,7 @@ def show_digital_block():
     #             st.markdown(f"[{price_str}]({release_url})", unsafe_allow_html=True)
     #         elif price_str:
     #             st.markdown(f":green[{price_str}]")
-    #         if platform_str == "iTunes" and entry.get("preview") and is_real_hit(entry):
+    #         Preview functionality removed with iTunes
     #             st.audio(entry["preview"], format="audio/mp4")
     # 
     #     st.markdown("---")

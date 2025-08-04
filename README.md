@@ -27,9 +27,3 @@ git status
 ## Environment aktivieren:
 
 source ~/venv/bin/activate   
-
-
-#  Test Keywords:
-  - Digital scenario: "test artist", "digital artist", "test track", "digital track"
-  - Vinyl scenario: "vinyl artist", "rare artist", album with "vinyl"/"rare"
-  - Discogs-only: "discogs" artist, "vintage" track, "catalog" catalog numbere

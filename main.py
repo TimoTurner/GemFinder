@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from providers import (
     SearchManager,
     DiscogsProvider, RevibedProvider,
-    ItunesProvider, BeatportProvider, BandcampProvider, TraxsourceProvider
+    BeatportProvider, BandcampProvider, TraxsourceProvider
 )
 from state_manager import AppState
 from ui_helpers import (
@@ -210,7 +210,7 @@ def check_button_state():
     criteria = app_state.get_criteria()
     
     # Provider lists
-    digital_providers   = [ItunesProvider(), BeatportProvider(), BandcampProvider(), TraxsourceProvider()]
+    digital_providers   = [BeatportProvider(), BandcampProvider(), TraxsourceProvider()]
     secondary_providers = [DiscogsProvider(), RevibedProvider()]
     
     # Check which platforms can search with current criteria
@@ -417,7 +417,7 @@ app_state = AppState()
 criteria = app_state.get_criteria()
 
 # Provider lists
-digital_providers   = [ItunesProvider(), BeatportProvider(), BandcampProvider(), TraxsourceProvider()]
+digital_providers   = [BeatportProvider(), BandcampProvider(), TraxsourceProvider()]
 secondary_providers = [DiscogsProvider(), RevibedProvider()]
 
 # Check which platforms can search with current criteria
@@ -508,12 +508,18 @@ if search_clicked or track_search_clicked:
 
         # Stage 1: Search digital platforms if criteria met
         if can_search_digital:
-            st.session_state.show_digital = True
+            print("🔍 DEBUG: Starting OPTIMIZED digital search path")
+            st.session_state.show_digital = True  
             st.session_state.discogs_revibed_mode = False
             
-            # Live search digital platforms - PARALLEL EXECUTION
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                # Alle Provider parallel starten
+            # Digital platforms parallel search (iTunes will be re-added later)
+            print(f"🔍 DEBUG: Starting digital platforms in parallel")
+            
+            # Show progress bar immediately when search starts
+            with live_container:
+                show_live_results()
+            
+            with ThreadPoolExecutor(max_workers=3) as executor:
                 futures = {executor.submit(search_platform_thread_safe, p, criteria): p 
                           for p in digital_providers if p.can_search(criteria)}
                 
@@ -524,7 +530,6 @@ if search_clicked or track_search_clicked:
                     if thread_result["status"] == "success":
                         entry = thread_result["result"]
                     else:
-                        # Fehler-Ergebnis erstellen
                         entry = {
                             "platform": thread_result["provider"],
                             "title": "Fehler",
@@ -546,7 +551,7 @@ if search_clicked or track_search_clicked:
             # Mark digital search as done
             st.session_state.digital_search_done = True
             
-            # Check for real hits (including iTunes)
+            # Check for real hits
             real_hits = [
                 r for r in st.session_state.results_digital
                 if (r.get("title") or "").strip().lower() not in ("kein treffer", "", "fehler")

@@ -206,6 +206,9 @@ def search_beatport(artist, track):
         from selenium.webdriver.support import expected_conditions as EC
         import time
         
+        print(f"🎧 Beatport search: '{artist}' - '{track}'")
+        start_time = time.time()
+        
         url = f"https://www.beatport.com/search/tracks?q={artist}%20{track}"
         
         options = webdriver.ChromeOptions()
@@ -303,14 +306,18 @@ def search_beatport(artist, track):
                 continue
         
         driver.quit()
+        elapsed_time = time.time() - start_time
         
         # Select best result based on relevance score
         if candidates:
             best_result = max(candidates, key=lambda x: x['relevance_score'])
             # Remove score from final result (internal use only)
             best_result.pop('relevance_score', None)
+            best_result['search_time'] = elapsed_time
+            print(f"✅ Beatport result: {elapsed_time:.3f}s -> {best_result['title']}")
             return [best_result]
         else:
+            print(f"❌ Beatport no results: {elapsed_time:.3f}s")
             return [{
                 'platform': 'Beatport',
                 'title': 'Kein Treffer',
@@ -320,7 +327,7 @@ def search_beatport(artist, track):
                 'price': '',
                 'cover_url': '',
                 'url': '',
-                'search_time': 2.0
+                'search_time': elapsed_time
             }]
         
     except ImportError:
@@ -354,7 +361,8 @@ def search_beatport(artist, track):
             }]
     
     except Exception as e:
-        print(f"❌ Beatport scraper error: {e}")
+        elapsed_time = time.time() - locals().get('start_time', time.time())
+        print(f"❌ Beatport scraper error: {e} (after {elapsed_time:.3f}s)")
         return [{
             'platform': 'Beatport',
             'title': '❌ Beatport Suche nicht verfügbar',
@@ -364,7 +372,7 @@ def search_beatport(artist, track):
             'price': '',
             'cover_url': '',
             'url': '',
-            'search_time': 0.1
+            'search_time': elapsed_time
         }]
 
 # --- BANDCAMP DUMMY ---
@@ -377,6 +385,9 @@ def search_bandcamp(artist, track):
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
         import time
+        
+        print(f"🎼 Bandcamp search: '{artist}' - '{track}'")
+        start_time = time.time()
         
         url = f"https://bandcamp.com/search?q={artist}%20{track}"
         
@@ -447,14 +458,18 @@ def search_bandcamp(artist, track):
                 continue
         
         driver.quit()
+        elapsed_time = time.time() - start_time
         
         # Select best result based on relevance score
         if candidates:
             best_result = max(candidates, key=lambda x: x['relevance_score'])
             # Remove score from final result (internal use only)
             best_result.pop('relevance_score', None)
+            best_result['search_time'] = elapsed_time
+            print(f"✅ Bandcamp result: {elapsed_time:.3f}s -> {best_result['title']}")
             return [best_result]
         else:
+            print(f"❌ Bandcamp no results: {elapsed_time:.3f}s")
             return [{
                 'platform': 'Bandcamp',
                 'title': 'Kein Treffer',
@@ -464,7 +479,7 @@ def search_bandcamp(artist, track):
                 'price': '',
                 'cover_url': '',
                 'url': '',
-                'search_time': 1.5
+                'search_time': elapsed_time
             }]
         
     except ImportError:
@@ -521,6 +536,9 @@ def search_traxsource(artist, track):
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
         import time
+        
+        print(f"🎶 Traxsource search: '{artist}' - '{track}'")
+        start_time = time.time()
         
         url = f"https://www.traxsource.com/search?term={artist}+{track}"
         
@@ -583,14 +601,18 @@ def search_traxsource(artist, track):
                 continue
         
         driver.quit()
+        elapsed_time = time.time() - start_time
         
         # Select best result based on relevance score
         if candidates:
             best_result = max(candidates, key=lambda x: x['relevance_score'])
             # Remove score from final result (internal use only)
             best_result.pop('relevance_score', None)
+            best_result['search_time'] = elapsed_time
+            print(f"✅ Traxsource result: {elapsed_time:.3f}s -> {best_result['title']}")
             return [best_result]
         else:
+            print(f"❌ Traxsource no results: {elapsed_time:.3f}s")
             return [{
                 'platform': 'Traxsource',
                 'title': 'Kein Treffer',
@@ -600,7 +622,7 @@ def search_traxsource(artist, track):
                 'price': '',
                 'cover_url': '',
                 'url': '',
-                'search_time': 1.0
+                'search_time': elapsed_time
             }]
         
     except ImportError:
@@ -657,6 +679,9 @@ def search_revibed(artist, album):
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
         import time
+        
+        print(f"💿 Revibed search: artist='{artist}' album='{album}'")
+        start_time = time.time()
         
         # Revibed search logic: Priority Artist first, then Album (not combined!)
         if artist and artist.strip():
@@ -744,21 +769,25 @@ def search_revibed(artist, album):
                 continue
         
         driver.quit()
+        elapsed_time = time.time() - start_time
         
         # Return first result or no results
         if results:
+            results[0]['search_time'] = elapsed_time
+            print(f"✅ Revibed result: {elapsed_time:.3f}s -> {results[0]['title']}")
             return [results[0]]
         else:
+            print(f"❌ Revibed no results: {elapsed_time:.3f}s")
             return [{
                 'platform': 'Revibed',
-                'title': 'Kein Treffer',
+                'title': 'Kein Treffer',  
                 'artist': '',
                 'album': '',
                 'label': '',
                 'price': '',
                 'cover_url': '',
                 'url': '',
-                'search_time': 1.5
+                'search_time': elapsed_time
             }]
         
     except ImportError:

@@ -1,7 +1,7 @@
 # providers.py
 from abc import ABC, abstractmethod
 from scrape_search import search_bandcamp, search_beatport, search_traxsource, search_revibed
-from api_search import get_itunes_release_info, search_discogs_releases, get_discogs_release_details
+from api_search import search_discogs_releases, get_discogs_release_details
 
 class SearchCriteria:
     def __init__(self, title: str = "", artist: str = "", album: str = "", catalog: str = ""):
@@ -89,51 +89,14 @@ class RevibedProvider(SearchProvider):
         }
 
 # —————————————————————————————
-# Digital-Shop-Provider (iTunes, Beatport, Bandcamp, Traxsource)
+# Digital-Shop-Provider (Beatport, Bandcamp, Traxsource)
 # —————————————————————————————
-class ItunesProvider(SearchProvider):
-    name = "iTunes"
-    def can_search(self, c: SearchCriteria) -> bool:
-        # Priority order as specified:
-        # 1. Title + Artist
-        # 2. Title + Album
-        # 3. Artist + Album
-        return bool(
-            (c.title and c.artist) or
-            (c.title and c.album) or
-            (c.artist and c.album)
-        )
-    def search(self, c: SearchCriteria) -> dict:
-        info = get_itunes_release_info(c.artist, c.title)
-        if info and info.get("release_url"):
-            return {
-                "platform":  self.name,
-                "title":     info.get("title",""),
-                "artist":    info.get("artist",c.artist),
-                "album":     info.get("album",""),
-                "label":     info.get("label",""),
-                "price":     info.get("price",""),
-                "cover_url": info.get("cover",""),
-                "url":       info.get("release_url",""),
-                "preview":   info.get("preview","")
-            }
-        else:
-            return {
-                "platform": self.name,
-                "title":    "Kein Treffer",
-                "artist":   c.artist,
-                "album":    c.album,
-                "label":    "",
-                "price":    "",
-                "cover_url":"",
-                "url":      "",
-                "preview":  ""
-            }
+# ItunesProvider removed - will be reimplemented
 
 class BeatportProvider(SearchProvider):
     name = "Beatport"
     def can_search(self, c: SearchCriteria) -> bool:
-        # Same criteria as iTunes:
+        # Digital platform criteria:
         # 1. Title + Artist
         # 2. Title + Album
         # 3. Artist + Album
@@ -151,7 +114,7 @@ class BeatportProvider(SearchProvider):
 class BandcampProvider(SearchProvider):
     name = "Bandcamp"
     def can_search(self, c: SearchCriteria) -> bool:
-        # Same criteria as iTunes:
+        # Digital platform criteria:
         # 1. Title + Artist
         # 2. Title + Album
         # 3. Artist + Album
@@ -169,7 +132,7 @@ class BandcampProvider(SearchProvider):
 class TraxsourceProvider(SearchProvider):
     name = "Traxsource"
     def can_search(self, c: SearchCriteria) -> bool:
-        # Same criteria as iTunes:
+        # Digital platform criteria:
         # 1. Title + Artist
         # 2. Title + Album
         # 3. Artist + Album

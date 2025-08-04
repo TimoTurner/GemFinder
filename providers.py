@@ -1,7 +1,7 @@
 # providers.py
 from abc import ABC, abstractmethod
 from scrape_search import search_bandcamp, search_beatport, search_traxsource, search_revibed
-from api_search import search_discogs_releases, get_discogs_release_details
+from api_search import search_discogs_releases, get_discogs_release_details, get_itunes_release_info
 
 class SearchCriteria:
     def __init__(self, title: str = "", artist: str = "", album: str = "", catalog: str = ""):
@@ -89,9 +89,25 @@ class RevibedProvider(SearchProvider):
         }
 
 # —————————————————————————————
-# Digital-Shop-Provider (Beatport, Bandcamp, Traxsource)
+# Digital-Shop-Provider (iTunes, Beatport, Bandcamp, Traxsource)
 # —————————————————————————————
-# ItunesProvider removed - will be reimplemented
+
+class ItunesProvider(SearchProvider):
+    name = "iTunes"
+    def can_search(self, c: SearchCriteria) -> bool:
+        # Digital platform criteria:
+        # 1. Title + Artist
+        # 2. Title + Album
+        # 3. Artist + Album
+        return bool(
+            (c.title and c.artist) or
+            (c.title and c.album) or
+            (c.artist and c.album)
+        )
+    def search(self, c: SearchCriteria) -> dict:
+        result = get_itunes_release_info(c.artist, c.title)
+        result["platform"] = self.name
+        return result
 
 class BeatportProvider(SearchProvider):
     name = "Beatport"

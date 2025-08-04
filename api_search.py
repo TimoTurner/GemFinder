@@ -2,7 +2,127 @@ import requests
 import time
 from functools import lru_cache
 
-# iTunes implementation removed - will be added back cleanly
+# iTunes API implementation
+_itunes_session = None
+
+def get_itunes_session():
+    """Get or create global iTunes session optimized for Streamlit"""
+    global _itunes_session
+    if _itunes_session is None:
+        _itunes_session = requests.Session()
+        # Optimized adapter settings for Streamlit context
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=2,      # Reduced for Streamlit
+            pool_maxsize=4,          # Smaller pool
+            max_retries=0,           # No retries in ThreadPool context
+            pool_block=False         # Don't block on pool exhaustion
+        )
+        _itunes_session.mount('https://', adapter)
+        _itunes_session.headers.update({
+            'User-Agent': 'GemFinder/1.0',
+            'Accept': 'application/json',
+            'Connection': 'close'    # Force connection close for Streamlit
+        })
+    return _itunes_session
+
+def get_itunes_release_info(artist, track):
+    """iTunes API search with optimized implementation for Streamlit"""
+    import socket
+    import time
+    
+    try:
+        print(f"🎵 iTunes API search: '{artist}' - '{track}'")
+        t0 = time.time()
+        
+        query = f"{artist} {track}"
+        url = "https://itunes.apple.com/search"
+        params = {"term": query, "entity": "song", "limit": 1, "country": "DE"}
+        
+        print(f"⏱️ Setup time: {time.time()-t0:.3f}s")
+        
+        # Force IPv4 to avoid IPv6 timeout delays
+        original_getaddrinfo = socket.getaddrinfo
+        def getaddrinfo_ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
+            return original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+        socket.getaddrinfo = getaddrinfo_ipv4_only
+        
+        try:
+            session = get_itunes_session()
+            t1 = time.time()
+            print(f"⏱️ Session get time: {t1-t0:.3f}s")
+            
+            # Retry logic for Streamlit context
+            for attempt in range(2):  # 2 attempts max
+                try:
+                    t_request = time.time()
+                    print(f"🔧 Attempt {attempt + 1}: Starting iTunes request")
+                    
+                    # Shorter connect timeout, longer read timeout for API responses
+                    response = session.get(url, params=params, timeout=(2, 8))
+                    
+                    t2 = time.time()
+                    print(f"⏱️ HTTP request time: {t2-t_request:.3f}s")
+                    break
+                except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout) as e:
+                    attempt_time = time.time() - t_request
+                    print(f"❌ Attempt {attempt + 1} failed after {attempt_time:.3f}s: {e}")
+                    if attempt == 1:  # Last attempt
+                        raise e
+                    time.sleep(0.1)  # Brief pause before retry
+        finally:
+            # Restore original getaddrinfo
+            socket.getaddrinfo = original_getaddrinfo
+        
+        elapsed = time.time() - t0
+        print(f"✅ iTunes API total time: {elapsed:.3f}s, Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("results"):
+                r = data["results"][0]
+                print(f"🎯 iTunes found result: {r.get('trackName', 'No Title')}")
+                return {
+                    "platform": "iTunes",
+                    "title": r.get("trackName", ""),
+                    "artist": r.get("artistName", ""),
+                    "album": r.get("collectionName", ""),
+                    "label": "iTunes Store",
+                    "price": f"{r.get('trackPrice', '')} {r.get('currency', '')}".strip() if r.get("trackPrice") else "",
+                    "cover_url": r.get("artworkUrl100", ""),
+                    "url": r.get("trackViewUrl", ""),
+                    "preview": r.get("previewUrl", "")
+                }
+            else:
+                print("📭 iTunes: No results in response")
+        else:
+            print(f"❌ iTunes API error: Status {response.status_code}")
+        
+        return {
+            "platform": "iTunes", 
+            "title": "Kein Treffer", 
+            "artist": "", 
+            "album": "", 
+            "label": "", 
+            "price": "", 
+            "cover_url": "", 
+            "url": "", 
+            "preview": ""
+        }
+        
+    except Exception as e:
+        elapsed = time.time() - t0 if 't0' in locals() else 0
+        print(f"❌ iTunes API error after {elapsed:.3f}s: {e}")
+        return {
+            "platform": "iTunes", 
+            "title": "❌ iTunes Suche nicht verfügbar", 
+            "artist": "", 
+            "album": "", 
+            "label": "", 
+            "price": "", 
+            "cover_url": "", 
+            "url": "", 
+            "preview": ""
+        }
 
 def search_discogs_releases(artist=None, track=None, album=None, catno=None):
     """Real Discogs API implementation"""

@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from providers import (
     SearchManager,
     DiscogsProvider, RevibedProvider,
-    BeatportProvider, BandcampProvider, TraxsourceProvider
+    ItunesProvider, BeatportProvider, BandcampProvider, TraxsourceProvider
 )
 from state_manager import AppState
 from ui_helpers import (
@@ -210,7 +210,7 @@ def check_button_state():
     criteria = app_state.get_criteria()
     
     # Provider lists
-    digital_providers   = [BeatportProvider(), BandcampProvider(), TraxsourceProvider()]
+    digital_providers   = [ItunesProvider(), BeatportProvider(), BandcampProvider(), TraxsourceProvider()]
     secondary_providers = [DiscogsProvider(), RevibedProvider()]
     
     # Check which platforms can search with current criteria
@@ -417,7 +417,7 @@ app_state = AppState()
 criteria = app_state.get_criteria()
 
 # Provider lists
-digital_providers   = [BeatportProvider(), BandcampProvider(), TraxsourceProvider()]
+digital_providers   = [ItunesProvider(), BeatportProvider(), BandcampProvider(), TraxsourceProvider()]
 secondary_providers = [DiscogsProvider(), RevibedProvider()]
 
 # Check which platforms can search with current criteria
@@ -519,7 +519,7 @@ if search_clicked or track_search_clicked:
             with live_container:
                 show_live_results()
             
-            with ThreadPoolExecutor(max_workers=3) as executor:
+            with ThreadPoolExecutor(max_workers=4) as executor:
                 futures = {executor.submit(search_platform_thread_safe, p, criteria): p 
                           for p in digital_providers if p.can_search(criteria)}
                 

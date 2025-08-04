@@ -602,7 +602,7 @@ def show_live_results():
     
     # Show progress bar with platform status
     platform_status = {}
-    total_platforms = 3  # Beatport, Bandcamp, Traxsource (iTunes will be re-added)
+    total_platforms = 4  # iTunes, Beatport, Bandcamp, Traxsource
     
     for result in live_results:
         platform = result.get("platform", "Unknown")
@@ -618,7 +618,7 @@ def show_live_results():
     
     # Build progress string
     progress_parts = []
-    for platform in ["Beatport", "Bandcamp", "Traxsource"]:
+    for platform in ["iTunes", "Beatport", "Bandcamp", "Traxsource"]:
         status = platform_status.get(platform, "⏳")
         progress_parts.append(f"{platform} {status}")
     
@@ -702,7 +702,7 @@ def show_live_results():
                 elif price_str:
                     st.markdown(f":green[{price_str}]")
                 
-                # Preview functionality (will be re-added with iTunes)
+                # Preview functionality for iTunes
                 if entry.get("preview") and is_real_hit:
                     st.audio(entry["preview"], format="audio/mp4")
             

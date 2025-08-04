@@ -122,7 +122,7 @@ class BeatportProvider(SearchProvider):
             (c.artist and c.album)
         )
     def search(self, c: SearchCriteria) -> dict:
-        hits = search_beatport(c.artist, c.title)
+        hits = search_beatport(c.artist, c.title, c.album)
         entry = hits[0] if hits else {"platform":self.name,"title":"Kein Treffer"}
         entry["platform"] = self.name
         return entry

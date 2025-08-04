@@ -5,6 +5,29 @@ from functools import lru_cache
 # iTunes API implementation
 _itunes_session = None
 
+def itunes_filter_result(search_artist, search_track, result_title, result_artist, result_album):
+    """
+    Moderate filtering for iTunes - one search term must match (less strict than Beatport)
+    """
+    from scrape_search import normalize_for_matching
+    
+    # Normalize search terms
+    s_artist = normalize_for_matching(search_artist) if search_artist else ""
+    s_track = normalize_for_matching(search_track) if search_track else ""
+    
+    # Normalize result fields
+    r_title = normalize_for_matching(result_title) if result_title else ""
+    r_artist = normalize_for_matching(result_artist) if result_artist else ""
+    r_album = normalize_for_matching(result_album) if result_album else ""
+    
+    # Check if at least one search term is found in the result
+    if s_artist and (s_artist in r_title or s_artist in r_artist or s_artist in r_album):
+        return True
+    if s_track and (s_track in r_title or s_track in r_artist or s_track in r_album):
+        return True
+    
+    return False
+
 def get_itunes_session():
     """Get or create global iTunes session optimized for Streamlit"""
     global _itunes_session
@@ -36,7 +59,7 @@ def get_itunes_release_info(artist, track):
         
         query = f"{artist} {track}"
         url = "https://itunes.apple.com/search"
-        params = {"term": query, "entity": "song", "limit": 1, "country": "DE"}
+        params = {"term": query, "entity": "song", "limit": 3, "country": "DE"}  # Get 3 results for filtering
         
         print(f"⏱️ Setup time: {time.time()-t0:.3f}s")
         
@@ -78,20 +101,43 @@ def get_itunes_release_info(artist, track):
         
         if response.status_code == 200:
             data = response.json()
-            if data.get("results"):
-                r = data["results"][0]
-                print(f"🎯 iTunes found result: {r.get('trackName', 'No Title')}")
-                return {
-                    "platform": "iTunes",
-                    "title": r.get("trackName", ""),
-                    "artist": r.get("artistName", ""),
-                    "album": r.get("collectionName", ""),
-                    "label": "iTunes Store",
-                    "price": f"{r.get('trackPrice', '')} {r.get('currency', '')}".strip() if r.get("trackPrice") else "",
-                    "cover_url": r.get("artworkUrl100", ""),
-                    "url": r.get("trackViewUrl", ""),
-                    "preview": r.get("previewUrl", "")
-                }
+            results = data.get("results", [])
+            if results:
+                print(f"🎯 iTunes found {len(results)} results, filtering...")
+                
+                # Filter results to find the most relevant one
+                filtered_candidates = []
+                for i, r in enumerate(results):
+                    track_name = r.get("trackName", "")
+                    artist_name = r.get("artistName", "")
+                    album_name = r.get("collectionName", "")
+                    
+                    print(f"  Result {i+1}: '{track_name}' by '{artist_name}'")
+                    
+                    # Apply iTunes filter (moderate strictness)
+                    if itunes_filter_result(artist, track, track_name, artist_name, album_name):
+                        print(f"    ✅ Passed filter")
+                        filtered_candidates.append(r)
+                    else:
+                        print(f"    ❌ Filtered out - not relevant")
+                
+                if filtered_candidates:
+                    # Take the first filtered result (iTunes usually orders by relevance)
+                    r = filtered_candidates[0]
+                    print(f"🎯 iTunes selected: {r.get('trackName', 'No Title')}")
+                    return {
+                        "platform": "iTunes",
+                        "title": r.get("trackName", ""),
+                        "artist": r.get("artistName", ""),
+                        "album": r.get("collectionName", ""),
+                        "label": "iTunes Store",
+                        "price": f"{r.get('trackPrice', '')} {r.get('currency', '')}".strip() if r.get("trackPrice") else "",
+                        "cover_url": r.get("artworkUrl100", ""),
+                        "url": r.get("trackViewUrl", ""),
+                        "preview": r.get("previewUrl", "")
+                    }
+                else:
+                    print("📭 iTunes: All results filtered out - no relevant matches")
             else:
                 print("📭 iTunes: No results in response")
         else:

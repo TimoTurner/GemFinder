@@ -143,6 +143,40 @@ def normalize_for_matching(text):
     text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
     return text.lower().strip()
 
+def beatport_strict_filter(search_artist, search_track, search_album, result_title, result_artist, result_album):
+    """
+    Word-based filtering for Beatport - at least one word from EACH search term must be found
+    Prevents false matches like "PICASSO Extended Mix" for "Drum Starts - Picasso"
+    """
+    # Split search terms into words
+    artist_words = search_artist.lower().split() if search_artist else []
+    track_words = search_track.lower().split() if search_track else []
+    album_words = search_album.lower().split() if search_album else []
+    
+    # Combined result content (normalized)
+    result_content = f"{result_title} {result_artist} {result_album}".lower()
+    
+    # Check if at least one word from each search term is found
+    artist_found = any(word in result_content for word in artist_words) if artist_words else True
+    track_found = any(word in result_content for word in track_words) if track_words else True
+    album_found = any(word in result_content for word in album_words) if album_words else True
+    
+    # Logic based on what search terms we have - BOTH terms must have matches
+    if search_artist and search_track:
+        return artist_found and track_found
+    elif search_artist and search_album:
+        return artist_found and album_found
+    elif search_track and search_album:
+        return track_found and album_found
+    elif search_artist:
+        return artist_found
+    elif search_track:
+        return track_found
+    elif search_album:
+        return album_found
+    else:
+        return False
+
 def calculate_relevance_score(artist, track, title, artist_found, additional_text=""):
     """
     Calculate relevance score for search results
@@ -196,7 +230,7 @@ def flexible_search_match(artist, track, title, artist_found, additional_text=""
 # from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # --- BEATPORT DUMMY ---
-def search_beatport(artist, track):
+def search_beatport(artist, track, album=""):
     """Beatport scraper with test dummy and fallback error handling"""
     try:
         # Real Beatport scraper implementation
@@ -206,10 +240,20 @@ def search_beatport(artist, track):
         from selenium.webdriver.support import expected_conditions as EC
         import time
         
-        print(f"🎧 Beatport search: '{artist}' - '{track}'")
+        # Build search query based on available parameters
+        search_terms = []
+        if artist:
+            search_terms.append(artist)
+        if track:
+            search_terms.append(track)
+        if album:
+            search_terms.append(album)
+        
+        search_query = "%20".join(search_terms)
+        print(f"🎧 Beatport search: '{' + '.join(search_terms)}'")
         start_time = time.time()
         
-        url = f"https://www.beatport.com/search/tracks?q={artist}%20{track}"
+        url = f"https://www.beatport.com/search/tracks?q={search_query}"
         
         options = webdriver.ChromeOptions()
         options.add_argument('--headless=new')
@@ -231,12 +275,34 @@ def search_beatport(artist, track):
         except:
             pass
         
-        # Updated Beatport selector (December 2024)
-        wait.until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, 'div[data-testid="tracks-list-item"]')
-        ))
-        
-        rows = driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="tracks-list-item"]')
+        # Check if there are any results first, instead of waiting for elements that might not exist
+        try:
+            wait.until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, 'div[data-testid="tracks-list-item"]')
+            ))
+            rows = driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="tracks-list-item"]')
+        except:
+            # No track rows found - check if this is "no results" or a real error
+            page_source = driver.page_source.lower()
+            if "no results" in page_source or "keine ergebnisse" in page_source or len(page_source) > 1000:
+                # Page loaded successfully but no results found
+                print(f"📭 Beatport no results: No tracks found for search")
+                driver.quit()
+                elapsed_time = time.time() - start_time
+                return [{
+                    'platform': 'Beatport',
+                    'title': 'Kein Treffer',
+                    'artist': '',
+                    'album': '',
+                    'label': '',
+                    'price': '',
+                    'cover_url': '',
+                    'url': '',
+                    'search_time': elapsed_time
+                }]
+            else:
+                # Real error - page didn't load properly
+                raise Exception("Page did not load properly")
         
         if not rows:
             print("Beatport: No results found with any selector")
@@ -282,12 +348,12 @@ def search_beatport(artist, track):
                     price_elem = row.find_element(By.CSS_SELECTOR, 'button.add-to-cart .price')
                     price = price_elem.text.strip()
                 except:
-                    price = "€1.39"
+                    price = ""  # No fallback price - leave empty if not found
                 
-                # Calculate relevance score for this result
-                score = calculate_relevance_score(artist, track, title, artists, f"{label} {album}")
+                # Use Beatport-specific filtering (less strict than before)
+                is_relevant = beatport_strict_filter(artist, track, album, title, artists, album)
                 
-                if score > 0:  # Only include relevant matches
+                if is_relevant:  # Only include matches that pass Beatport filter
                     candidate = {
                         'platform': 'Beatport',
                         'title': title,
@@ -298,7 +364,7 @@ def search_beatport(artist, track):
                         'cover_url': cover_url,
                         'url': f'https://www.beatport.com/track/{title.lower().replace(" ", "-")}',
                         'search_time': 2.0,
-                        'relevance_score': score
+                        'relevance_score': 8  # Fixed score for valid matches
                     }
                     candidates.append(candidate)
             except Exception as e:
@@ -376,6 +442,78 @@ def search_beatport(artist, track):
         }]
 
 # --- BANDCAMP DUMMY ---
+def extract_bandcamp_price(driver, item_url):
+    """Extract price from individual Bandcamp track page"""
+    from selenium.webdriver.common.by import By
+    import re
+    try:
+        # Save current window handle
+        main_window = driver.current_window_handle
+        
+        # Open new tab for price checking
+        driver.execute_script("window.open('');")
+        driver.switch_to.window(driver.window_handles[-1])
+        
+        driver.get(item_url)
+        
+        # Wait a bit for page to load
+        import time
+        time.sleep(1)
+        
+        # Extract price from buy section text
+        try:
+            buy_item = driver.find_element(By.CSS_SELECTOR, '.buyItem')
+            buy_text = buy_item.text.lower()
+            
+            # Check for "name your price" patterns without minimum
+            nyp_phrases = ['name your price', 'nenne deinen preis', 'pay what you want']
+            if any(phrase in buy_text for phrase in nyp_phrases) and not any(currency in buy_text for currency in ['£', '$', '€']):
+                price = "nyp"
+            else:
+                # Look for minimum price patterns
+                import re
+                price_patterns = [
+                    r'(£\d+(?:\.\d{2})?)\s*gbp',
+                    r'(\$\d+(?:\.\d{2})?)\s*usd', 
+                    r'(€\d+(?:\.\d{2})?)',
+                    r'(\d+(?:\.\d{2})?)\s*(gbp|usd|eur)'
+                ]
+                
+                price = ""
+                for pattern in price_patterns:
+                    matches = re.findall(pattern, buy_text, re.IGNORECASE)
+                    if matches:
+                        if isinstance(matches[0], tuple):
+                            price = matches[0][0]  # Extract price part from tuple
+                        else:
+                            price = matches[0]
+                        break
+                
+                # If no specific price but mentions "oder mehr" or "or more", it's nyp
+                if not price and ('oder mehr' in buy_text or 'or more' in buy_text):
+                    price = "nyp"
+                    
+        except Exception as e:
+            print(f"Error extracting Bandcamp price: {e}")
+            price = ""
+        
+        # Close the tab and switch back
+        driver.close()
+        driver.switch_to.window(main_window)
+        
+        return price
+        
+    except Exception as e:
+        print(f"❌ Error extracting Bandcamp price: {e}")
+        # Make sure we're back to main window
+        try:
+            if len(driver.window_handles) > 1:
+                driver.close()
+                driver.switch_to.window(driver.window_handles[0])
+        except:
+            pass
+        return ""  # No fallback price
+
 def search_bandcamp(artist, track):
     """Bandcamp scraper with test dummy and fallback error handling"""
     try:
@@ -403,9 +541,33 @@ def search_bandcamp(artist, track):
         driver.get(url)
         wait = WebDriverWait(driver, 15)
         
-        search_results = wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'li.searchresult'))
-        )
+        # Check if there are any results first, instead of waiting for elements that might not exist
+        try:
+            search_results = wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'li.searchresult'))
+            )
+        except:
+            # No search results found - check if this is "no results" or a real error
+            page_source = driver.page_source.lower()
+            if "no results" in page_source or "keine ergebnisse" in page_source or len(page_source) > 1000:
+                # Page loaded successfully but no results found
+                print(f"📭 Bandcamp no results: No search results found")
+                driver.quit()
+                elapsed_time = time.time() - start_time
+                return [{
+                    'platform': 'Bandcamp',
+                    'title': 'Kein Treffer',
+                    'artist': '',
+                    'album': '',
+                    'label': '',
+                    'price': '',
+                    'cover_url': '',
+                    'url': '',
+                    'search_time': elapsed_time
+                }]
+            else:
+                # Real error - page didn't load properly
+                raise Exception("Page did not load properly")
         
         results = []
         candidates = []  # Collect top 3 candidates for relevance scoring
@@ -429,12 +591,12 @@ def search_bandcamp(artist, track):
                 
                 # Extract label from URL
                 try:
-                    label = driver.current_url.split(".bandcamp.com")[0].replace("https://", "") if ".bandcamp.com" in item_url else "Independent"
+                    label = item_url.split(".bandcamp.com")[0].replace("https://", "") if ".bandcamp.com" in item_url else "Independent"
                 except:
                     label = "Independent"
                 
-                # Simple price extraction without opening new windows (for performance)
-                price = "€3.00"  # Default Bandcamp price
+                # Extract real price from individual track page
+                price = extract_bandcamp_price(driver, item_url)
                 
                 # Calculate relevance score for this result
                 score = calculate_relevance_score(artist, track, title, artist_name)
@@ -554,9 +716,33 @@ def search_traxsource(artist, track):
         driver.get(url)
         wait = WebDriverWait(driver, 10)
         
-        track_rows = wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div.trk-row'))
-        )
+        # Check if there are any results first, instead of waiting for elements that might not exist
+        try:
+            track_rows = wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div.trk-row'))
+            )
+        except:
+            # No track rows found - check if this is "no results" or a real error
+            page_source = driver.page_source.lower()
+            if "no results" in page_source or "no tracks found" in page_source or len(page_source) > 1000:
+                # Page loaded successfully but no results found
+                print(f"📭 Traxsource no results: No tracks found for search")
+                driver.quit()
+                elapsed_time = time.time() - start_time
+                return [{
+                    'platform': 'Traxsource',
+                    'title': 'Kein Treffer',
+                    'artist': '',
+                    'album': '',
+                    'label': '',
+                    'price': '',
+                    'cover_url': '',
+                    'url': '',
+                    'search_time': elapsed_time
+                }]
+            else:
+                # Real error - page didn't load properly
+                raise Exception("Page did not load properly")
         
         results = []
         candidates = []  # Collect top 3 candidates for relevance scoring
@@ -719,9 +905,33 @@ def search_revibed(artist, album):
         
         wait = WebDriverWait(driver, 15)
         
-        items = wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.styles_marketplaceGoods__r5WKf"))
-        )
+        # Check if there are any results first, instead of waiting for elements that might not exist
+        try:
+            items = wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.styles_marketplaceGoods__r5WKf"))
+            )
+        except:
+            # No items found - check if this is "no results" or a real error
+            page_source = driver.page_source.lower()
+            if "no results" in page_source or "keine ergebnisse" in page_source or len(page_source) > 1000:
+                # Page loaded successfully but no results found
+                print(f"📭 Revibed no results: No items found for search")
+                driver.quit()
+                elapsed_time = time.time() - start_time
+                return [{
+                    'platform': 'Revibed',
+                    'title': 'Kein Treffer',
+                    'artist': '',
+                    'album': '',
+                    'label': '',
+                    'price': '',
+                    'cover_url': '',
+                    'url': '',
+                    'search_time': elapsed_time
+                }]
+            else:
+                # Real error - page didn't load properly
+                raise Exception("Page did not load properly")
         
         results = []
         
@@ -742,6 +952,30 @@ def search_revibed(artist, album):
                 except:
                     cover_url = ''
                 
+                # Extract real price
+                try:
+                    price_elem = item.find_element(By.CSS_SELECTOR, ".styles_marketplaceGoods__price__content__NwHxk")
+                    price = price_elem.text.strip()
+                except:
+                    try:
+                        # Alternative price selector
+                        price_elem = item.find_element(By.CSS_SELECTOR, "[class*='price']")
+                        price = price_elem.text.strip()
+                    except:
+                        price = ""
+                
+                # Extract real label
+                try:
+                    label_elem = item.find_element(By.CSS_SELECTOR, ".styles_projectNames__project__label__IJ3r5")
+                    label = label_elem.text.strip()
+                except:
+                    try:
+                        # Alternative label selector
+                        label_elem = item.find_element(By.CSS_SELECTOR, "[class*='label']")
+                        label = label_elem.text.strip()
+                    except:
+                        label = ""
+                
                 # Filter by search keywords (Revibed: Artist OR Album priority)
                 if artist and artist.strip():
                     # Priority: Artist search
@@ -758,8 +992,8 @@ def search_revibed(artist, album):
                         'title': title,
                         'artist': artist,  # Use provided artist
                         'album': album_name,
-                        'label': 'Vintage Records',
-                        'price': '€45.00',  # Default vintage price
+                        'label': label,
+                        'price': price,
                         'cover_url': cover_url,
                         'url': f'https://revibed.com/item/{title.lower().replace(" ", "-")}',
                         'search_time': 1.5

@@ -443,58 +443,77 @@ def search_beatport(artist, track, album=""):
 
 # --- BANDCAMP DUMMY ---
 def extract_bandcamp_price(driver, item_url):
-    """Extract price from individual Bandcamp track page"""
+    """Extract price from individual Bandcamp track page with Track vs Album distinction"""
     from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
     import re
     try:
         # Save current window handle
         main_window = driver.current_window_handle
         
-        # Open new tab for price checking
+        # Open new tab for price checking (optimized)
         driver.execute_script("window.open('');")
         driver.switch_to.window(driver.window_handles[-1])
         
+        # Shorter timeout for track page
+        driver.set_page_load_timeout(3)
         driver.get(item_url)
         
-        # Wait a bit for page to load
-        import time
-        time.sleep(1)
+        # Optimized wait for buy section
+        wait = WebDriverWait(driver, 3)
         
-        # Extract price from buy section text
         try:
-            buy_item = driver.find_element(By.CSS_SELECTOR, '.buyItem')
+            # Wait for buy section to load
+            buy_item = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.buyItem')))
             buy_text = buy_item.text.lower()
             
-            # Check for "name your price" patterns without minimum
+            # Check what type of purchase is available
+            is_track_available = False
+            is_album_only = False
+            
+            # Detect track vs album availability
+            if 'buy digital track' in buy_text or 'digital track' in buy_text:
+                is_track_available = True
+            elif 'buy digital album' in buy_text or 'digital album' in buy_text:
+                is_album_only = True
+            
+            # Check for "name your price" patterns
             nyp_phrases = ['name your price', 'nenne deinen preis', 'pay what you want']
-            if any(phrase in buy_text for phrase in nyp_phrases) and not any(currency in buy_text for currency in ['£', '$', '€']):
-                price = "nyp"
+            has_nyp = any(phrase in buy_text for phrase in nyp_phrases)
+            
+            if has_nyp and not any(currency in buy_text for currency in ['£', '$', '€']):
+                price = "nyp (Track)" if is_track_available else "nyp (Album only)"
             else:
-                # Look for minimum price patterns
-                import re
+                # Look for price patterns
                 price_patterns = [
-                    r'(£\d+(?:\.\d{2})?)\s*gbp',
-                    r'(\$\d+(?:\.\d{2})?)\s*usd', 
+                    r'(£\d+(?:\.\d{2})?)',
+                    r'(\$\d+(?:\.\d{2})?)', 
                     r'(€\d+(?:\.\d{2})?)',
-                    r'(\d+(?:\.\d{2})?)\s*(gbp|usd|eur)'
                 ]
                 
-                price = ""
+                extracted_price = ""
                 for pattern in price_patterns:
-                    matches = re.findall(pattern, buy_text, re.IGNORECASE)
+                    matches = re.findall(pattern, buy_text)
                     if matches:
-                        if isinstance(matches[0], tuple):
-                            price = matches[0][0]  # Extract price part from tuple
-                        else:
-                            price = matches[0]
+                        extracted_price = matches[0]  # Take first price found
                         break
                 
-                # If no specific price but mentions "oder mehr" or "or more", it's nyp
-                if not price and ('oder mehr' in buy_text or 'or more' in buy_text):
-                    price = "nyp"
+                # Add context to price
+                if extracted_price:
+                    if is_track_available:
+                        price = f"{extracted_price} (Track)"
+                    elif is_album_only:
+                        price = f"{extracted_price} (Album only)"
+                    else:
+                        price = extracted_price  # Fallback without context
+                elif has_nyp:
+                    price = "nyp (Track)" if is_track_available else "nyp (Album only)"
+                else:
+                    price = ""
                     
         except Exception as e:
-            print(f"Error extracting Bandcamp price: {e}")
+            print(f"Timeout or error on Bandcamp track page: {e}")
             price = ""
         
         # Close the tab and switch back
@@ -534,12 +553,41 @@ def search_bandcamp(artist, track):
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
-        # Keep JavaScript/CSS enabled for Bandcamp compatibility
+        
+        # Performance optimizations for faster loading
+        options.add_argument('--disable-features=VizDisplayCompositor')
+        options.add_argument('--disable-background-timer-throttling')
+        options.add_argument('--disable-renderer-backgrounding')
+        options.add_argument('--disable-backgrounding-occluded-windows')
+        options.add_argument('--disable-ipc-flooding-protection')
+        options.add_argument('--dns-prefetch-disable')
+        options.add_argument('--disable-default-apps')
+        
+        # 1) DOM-ready strategy - stop at DOM complete, not all resources
+        options.add_argument('--page-load-strategy=eager')
+        
+        # 2) Block images and CSS for faster loading (we only need URLs from HTML)
+        options.add_argument('--blink-settings=imagesEnabled=false')
+        options.add_argument('--disable-extensions')
+        
+        # 3) JavaScript optimizations - block unnecessary resources
+        options.add_experimental_option("prefs", {
+            "profile.managed_default_content_settings.images": 2,  # Block images
+            "profile.default_content_setting_values.notifications": 2,  # Block notifications
+            "profile.default_content_settings.popups": 0  # Block popups
+        })
         
         driver = webdriver.Chrome(options=options)
         
+        # 4) Reduce implicit wait time (applies to all find_element calls)
+        driver.implicitly_wait(2)  # Down from default 15s
+        
+        # Set shorter page load timeout
+        driver.set_page_load_timeout(5)  # Down from unlimited
         driver.get(url)
-        wait = WebDriverWait(driver, 15)
+        
+        # Reduced explicit wait time
+        wait = WebDriverWait(driver, 5)  # Down from 15s
         
         # Check if there are any results first, instead of waiting for elements that might not exist
         try:
@@ -595,8 +643,13 @@ def search_bandcamp(artist, track):
                 except:
                     label = "Independent"
                 
-                # Extract real price from individual track page
-                price = extract_bandcamp_price(driver, item_url)
+                # Extract real price from individual track page (only for relevant results)
+                # Pre-calculate relevance to avoid unnecessary price extraction
+                temp_score = calculate_relevance_score(artist, track, title, artist_name)
+                if temp_score > 0:
+                    price = extract_bandcamp_price(driver, item_url)
+                else:
+                    price = ""  # Skip price extraction for irrelevant results
                 
                 # Calculate relevance score for this result
                 score = calculate_relevance_score(artist, track, title, artist_name)
@@ -898,12 +951,41 @@ def search_revibed(artist, album):
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
-        # Keep JavaScript/CSS enabled for Revibed compatibility
+        # Performance optimizations for faster loading
+        options.add_argument('--disable-features=VizDisplayCompositor')
+        options.add_argument('--disable-background-timer-throttling')
+        options.add_argument('--disable-renderer-backgrounding')
+        options.add_argument('--disable-backgrounding-occluded-windows')
+        options.add_argument('--disable-ipc-flooding-protection')
+        # Reduce timeout-related delays
+        options.add_argument('--dns-prefetch-disable')
+        options.add_argument('--disable-default-apps')
+        
+        # 1) DOM-ready strategy - stop at DOM complete, not all resources
+        options.add_argument('--page-load-strategy=eager')
+        
+        # 2) Block images and CSS for faster loading (we only need URLs from HTML)
+        options.add_argument('--blink-settings=imagesEnabled=false')
+        options.add_argument('--disable-extensions')
+        
+        # 3) JavaScript optimizations - block unnecessary resources
+        options.add_experimental_option("prefs", {
+            "profile.managed_default_content_settings.images": 2,  # Block images
+            "profile.default_content_setting_values.notifications": 2,  # Block notifications
+            "profile.default_content_settings.popups": 0  # Block popups
+        })
         
         driver = webdriver.Chrome(options=options)
+        
+        # 4) Reduce implicit wait time (applies to all find_element calls)
+        driver.implicitly_wait(2)  # Down from default 15s
+        
+        # Set shorter page load timeout
+        driver.set_page_load_timeout(5)  # Down from 10s
         driver.get(url)
         
-        wait = WebDriverWait(driver, 15)
+        # Reduced explicit wait time 
+        wait = WebDriverWait(driver, 5)  # Down from 8s
         
         # Check if there are any results first, instead of waiting for elements that might not exist
         try:

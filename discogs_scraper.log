@@ -732,3 +732,7 @@
 2025-08-02 12:09:04,265 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2791548634
 2025-08-02 12:09:04,297 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/985601407
 2025-08-02 12:09:04,297 - discogs_scraper - INFO - Successfully scraped 8 offers for release 8644981
+2025-08-04 22:19:47,475 - discogs_scraper - INFO - Scraping offers for release 1543120
+2025-08-04 22:19:55,528 - discogs_scraper - INFO - Successfully scraped 1 offers for release 1543120
+2025-08-04 22:20:17,241 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-04 22:20:23,155 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979

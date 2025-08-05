@@ -54,8 +54,14 @@ Search Form → Results Display
 - ✅ **Akzent-tolerant**: "Pina" findet "Piña" 
 - ✅ **Case-insensitive**: "swag" findet "SWAG"
 - ✅ **Teilstring-Match**: "Pina" findet "Pina Colada"
-- ✅ **Flexible AND-Logik**: Artist OR Track gefunden = Treffer
+- ✅ **Plattform-spezifische Filterlogik**: iTunes (moderate) vs Beatport (streng)
 - ❌ **Keine Satzzeichen-Normalisierung**: "SWAG" ≠ "S.W.A.G."
+
+**Neue Filterlogik (2024-08-04):**
+- **iTunes**: Moderate Filterung - mindestens einer der Suchbegriffe muss gefunden werden
+- **Beatport**: Strenge wortbasierte Filterung - mindestens ein Wort aus jedem Suchbegriff muss gefunden werden
+- **Verhindert**: Irrelevante Matches wie "PICASSO Extended Mix" für "Drum Starts - Picasso"
+- **Erlaubt**: Echte Treffer wie "All I Want (Original)" für "Weekender - All I want"
 
 **Relevanz-Scoring-System:**
 - **Top 3 Ergebnisse** werden analysiert (statt nur erstes)
@@ -139,6 +145,13 @@ Release Display:
 - ImportError/Exception → User-freundliche Fehlermeldung
 - Platform als "nicht verfügbar" markieren
 - Andere Platforms weiterlaufen lassen
+
+### **Scraper Timeout-Fixes (2024-08-04)**
+- **Problem behoben**: Alle Scraper zeigten "nicht verfügbar" statt "Kein Treffer" bei leeren Suchergebnissen
+- **Ursache**: WebDriverWait Timeouts bei fehlenden Elementen wurden als technische Fehler behandelt
+- **Lösung**: Try-catch Logik unterscheidet "keine Ergebnisse" von "technischen Problemen"
+- **Bandcamp**: "name your price" Erkennung für "nyp" statt hardcodierte Preise
+- **Alle Plattformen**: Hardcodierte Fallback-Daten entfernt (außer Test-Dummies A/a, B/b)
 
 ### **Platform Status**
 | Platform    | Status    | Trigger         |

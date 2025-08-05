@@ -221,7 +221,26 @@ def search_discogs_releases(artist=None, track=None, album=None, catno=None):
         }
         
         print(f"Searching Discogs API for: '{query}'")
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        
+        # Apply same IPv4 optimization as iTunes
+        import socket
+        original_getaddrinfo = socket.getaddrinfo
+        def getaddrinfo_ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
+            return original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+        socket.getaddrinfo = getaddrinfo_ipv4_only
+        
+        try:
+            # Use optimized session with same settings as iTunes
+            session = requests.Session()
+            session.headers.update({
+                'Connection': 'close'  # Force connection close for Streamlit
+            })
+            
+            # Optimized timeouts: 2s connect, 8s read (same as iTunes)
+            response = session.get(url, headers=headers, params=params, timeout=(2, 8))
+        finally:
+            # Restore original getaddrinfo
+            socket.getaddrinfo = original_getaddrinfo
         
         print(f"Discogs API Response: {response.status_code}")
         print(f"Response URL: {response.url}")

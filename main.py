@@ -19,7 +19,6 @@ from providers import (
 from state_manager import AppState
 from ui_helpers import (
     show_live_results,
-    show_digital_block,
     show_discogs_and_revibed_block
 )
 from utils import get_platform_info, is_fuzzy_match
@@ -561,12 +560,13 @@ if search_clicked or track_search_clicked:
             st.session_state.has_digital_hits = len(real_hits) > 0
 
             if st.session_state.has_digital_hits:
-                # Stage 1 complete: Live results already shown, just clear progress and show mode switch
+                # Stage 1 complete: Show final results with mode switch button
                 if "live_progress_container" in st.session_state:
                     st.session_state.live_progress_container.empty()
                 
-                with digital_container:
-                    show_digital_block()
+                # Final call to show_live_results to display mode switch button
+                with live_container:
+                    show_live_results()
             elif can_search_secondary:
                 # Stage 2: No digital hits -> automatically search secondary platforms
                 live_container.empty()
@@ -632,9 +632,9 @@ elif st.session_state.suche_gestartet and not app_state.is_cache_valid():
 # Display cached results if search already done and cache is valid
 elif st.session_state.suche_gestartet and app_state.is_cache_valid():
     if st.session_state.show_digital and st.session_state.digital_search_done:
-        # Show cached digital results
-        with digital_container:
-            show_digital_block()
+        # Show cached digital results via live container
+        with live_container:
+            show_live_results()
     elif st.session_state.discogs_revibed_mode and st.session_state.secondary_search_done:
         # Show cached secondary results  
         with digital_container:

@@ -707,13 +707,124 @@ def show_live_results():
                     st.audio(entry["preview"], format="audio/mp4")
             
             st.markdown("---")
+    
+    # Show mode switch button when there are digital hits (at least 1 real result)
+    if st.session_state.get("digital_search_done", False):
+        # Check if there are real hits
+        real_hits = [
+            r for r in st.session_state.get("live_results", [])
+            if (r.get("title") or "").strip().lower() not in ("kein treffer", "", "fehler")
+        ]
+        
+        # DEBUG: Terminal output (only once when button check happens)
+        if len(st.session_state.get("live_results", [])) > 0:
+            print("🔍 DEBUG - Mode Switch Button conditions:")
+            print(f"  digital_search_done: {st.session_state.get('digital_search_done', False)}")
+            print(f"  has_digital_hits: {st.session_state.get('has_digital_hits', False)}")
+            print(f"  live_results count: {len(st.session_state.get('live_results', []))}")
+            print(f"  real_hits count: {len(real_hits)}")
+            print(f"  secondary_search_done: {st.session_state.get('secondary_search_done', False)}")
+            for i, hit in enumerate(real_hits[:3]):
+                print(f"    Real hit {i+1}: {hit.get('platform', 'Unknown')} - {hit.get('title', 'No title')}")
+        
+        if len(real_hits) > 0:
+            # Button logic: search vs switch mode based on cache
+            if not st.session_state.get("secondary_search_done", False):
+                # First time clicking - perform search
+                if st.button("Search on Discogs and Revibed", key="discogs_search_digital"):
+                    import time
+                    start_time = time.time()
+                    print(f"🕐 Mode Switch Button clicked - Starting secondary search")
+                    
+                    st.session_state.discogs_revibed_mode = True
+                    st.session_state.show_digital         = False
+                    
+                    # Show progress bar immediately
+                    progress_container = st.empty()
+                    with progress_container.container():
+                        st.info("🔍 Searching Discogs and Revibed...")
+                        progress_bar = st.progress(0)
+                    
+                    setup_time = time.time() - start_time
+                    print(f"🕐 Setup completed: {setup_time:.3f}s")
+                    
+                    # Import providers for search
+                    from providers import DiscogsProvider, RevibedProvider, SearchCriteria
+                    from state_manager import AppState
+                    
+                    # Get current criteria
+                    app_state = AppState()
+                    criteria = app_state.get_criteria()
+                    
+                    # Search Discogs (usually the slow one)
+                    discogs_start = time.time()
+                    with progress_container.container():
+                        st.info("🔍 Searching Discogs API...")
+                        progress_bar.progress(25)
+                    
+                    print(f"🕐 Starting Discogs search at {discogs_start - start_time:.3f}s")
+                    
+                    discogs_provider = DiscogsProvider()
+                    if discogs_provider.can_search(criteria):
+                        discogs_result = discogs_provider.search(criteria)
+                        st.session_state.results_discogs = discogs_result.get("releases", [])
+                    else:
+                        st.session_state.results_discogs = []
+                    
+                    discogs_end = time.time()
+                    discogs_duration = discogs_end - discogs_start
+                    print(f"🕐 Discogs search completed: {discogs_duration:.3f}s")
+                    
+                    # Update progress
+                    revibed_start = time.time()
+                    with progress_container.container():
+                        st.info("🔍 Searching Revibed...")
+                        progress_bar.progress(75)
+                    
+                    print(f"🕐 Starting Revibed search at {revibed_start - start_time:.3f}s")
+                    
+                    # Search Revibed  
+                    revibed_provider = RevibedProvider()
+                    if revibed_provider.can_search(criteria):
+                        revibed_result = revibed_provider.search(criteria)
+                        st.session_state.results_revibed = [revibed_result]
+                    else:
+                        st.session_state.results_revibed = [{
+                            'platform': 'Revibed',
+                            'title': 'Nicht gesucht (Angaben fehlen)',
+                            'artist': '', 'album': '', 'label': '', 'price': '',
+                            'cover_url': '', 'url': '', 'search_time': 0.0
+                        }]
+                    
+                    revibed_end = time.time()
+                    revibed_duration = revibed_end - revibed_start
+                    print(f"🕐 Revibed search completed: {revibed_duration:.3f}s")
+                    
+                    # Complete progress
+                    with progress_container.container():
+                        st.info("✅ Search completed!")
+                        progress_bar.progress(100)
+                    
+                    st.session_state.secondary_search_done = True
+                    
+                    total_time = time.time() - start_time
+                    print(f"🕐 Total secondary search time: {total_time:.3f}s")
+                    print(f"🕐 Breakdown - Setup: {setup_time:.3f}s, Discogs: {discogs_duration:.3f}s, Revibed: {revibed_duration:.3f}s")
+                    
+                    # Clear progress after short delay
+                    time.sleep(0.5)
+                    progress_container.empty()
+                    
+                    st.rerun()
+            else:
+                # Already searched - just switch view (cache mode)
+                if st.button("Switch to Discogs and Revibed", key="discogs_switch_digital"):
+                    st.session_state.discogs_revibed_mode = True
+                    st.session_state.show_digital         = False
+                    st.rerun()
 
 
-def show_digital_block():
-    # FUNCTION DISABLED: This entire function creates duplicate digital results display
-    # The "Digital Results (Live)" section is already shown elsewhere
-    # Keeping function definition to avoid breaking imports
-    pass
+# show_digital_block() function removed - functionality moved to show_live_results()
     
     # COMMENTED OUT: Original duplicate display code
     # PLACEHOLDER_COVER = "cover_placeholder.png"   # neutrales Bild

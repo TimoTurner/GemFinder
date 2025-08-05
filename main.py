@@ -98,6 +98,10 @@ if "scroll_position" not in st.session_state:
 # st.image("record_mole_copy.png", width=220)
 st.image(os.path.join(os.path.dirname(__file__), "record_mole_copy.png"), width=220)     
 st.title("GEM DETECTOR")
+# Create containers with unique keys to force recreation on mode switches
+container_key = f"containers_{st.session_state.get('container_generation', 0)}"
+print(f"🔄 DEBUG: Creating containers with key: {container_key}")
+
 live_placeholder    = st.empty()
 digital_placeholder = st.empty()
 
@@ -498,6 +502,7 @@ if search_clicked or track_search_clicked:
         live_container.empty()
         digital_container.empty()
         st.session_state.live_results = []
+        st.session_state.mode_switch_button_shown = False  # Reset button flag for new search
         
         # Reset live results containers for new search
         if "live_results_containers" in st.session_state:
@@ -560,11 +565,11 @@ if search_clicked or track_search_clicked:
             st.session_state.has_digital_hits = len(real_hits) > 0
 
             if st.session_state.has_digital_hits:
-                # Stage 1 complete: Show final results with mode switch button
+                # Stage 1 complete: Show final results
                 if "live_progress_container" in st.session_state:
                     st.session_state.live_progress_container.empty()
                 
-                # Final call to show_live_results to display mode switch button
+                # Final call to show_live_results to display results
                 with live_container:
                     show_live_results()
             elif can_search_secondary:
@@ -629,6 +634,101 @@ elif st.session_state.suche_gestartet and not app_state.is_cache_valid():
     st.session_state.results_discogs = []
     st.session_state.results_revibed = []
 
+# Handle switch to cached secondary results - FORCE COMPLETE RESET
+if st.session_state.get("switch_to_cached_secondary", False):
+    print("🔄 DEBUG: Switching to cached secondary results")
+    st.session_state.switch_to_cached_secondary = False  # Reset flag
+    
+    # Increment container generation to force complete recreation
+    st.session_state.container_generation = st.session_state.get('container_generation', 0) + 1
+    
+    # Change flags
+    st.session_state.discogs_revibed_mode = True
+    st.session_state.show_digital = False
+    
+    # Clear all container states
+    for key in list(st.session_state.keys()):
+        if key.startswith(('live_results_', 'live_progress_', 'secondary_progress_')):
+            del st.session_state[key]
+
+# Handle secondary search trigger from mode switch button
+# Debug output removed to reduce noise
+
+if st.session_state.get("trigger_secondary_search", False) and can_search_secondary:
+    print("🔄 DEBUG: Mode switch triggered - starting secondary search")
+    st.session_state.trigger_secondary_search = False  # Reset flag
+    
+    # Clear containers for clean switch (keep minimal for new search)
+    live_container.empty()
+    digital_container.empty()
+    
+    # Switch to secondary mode
+    st.session_state.discogs_revibed_mode = True
+    st.session_state.show_digital = False
+    
+    # Create progress bar same style as digital search
+    if "secondary_progress_container" not in st.session_state:
+        st.session_state.secondary_progress_container = st.empty()
+    
+    # Show progress bar with platform status (same as digital search)
+    searchable_secondary = [p for p in secondary_providers if p.can_search(criteria)]
+    platform_status = {}
+    
+    with st.session_state.secondary_progress_container.container():
+        progress_text = ", ".join([f"{p.name} ⏳" for p in searchable_secondary])
+        st.info(f"🔍 Searching: {progress_text}")
+        st.progress(0)
+    
+    # Search secondary platforms with live updates
+    for i, p in enumerate(searchable_secondary):
+        print(f"🔍 DEBUG: Searching {p.name}...")
+        
+        # Update progress during search
+        with st.session_state.secondary_progress_container.container():
+            progress_parts = []
+            for j, provider in enumerate(searchable_secondary):
+                if j < i:
+                    progress_parts.append(f"{provider.name} ✅")
+                elif j == i:
+                    progress_parts.append(f"{provider.name} ⏳")
+                else:
+                    progress_parts.append(f"{provider.name} ⏳")
+            
+            progress_text = ", ".join(progress_parts)
+            st.info(f"🔍 Searching: {progress_text}")
+            st.progress((i + 0.5) / len(searchable_secondary))
+        
+        # Perform search
+        result = p.search(criteria)
+        if p.name == "Discogs":
+            st.session_state.results_discogs = result.get("releases", [])
+        elif p.name == "Revibed":
+            st.session_state.results_revibed = [result]
+        
+        # Update progress after completion
+        with st.session_state.secondary_progress_container.container():
+            progress_parts = []
+            for j, provider in enumerate(searchable_secondary):
+                if j <= i:
+                    progress_parts.append(f"{provider.name} ✅")
+                else:
+                    progress_parts.append(f"{provider.name} ⏳")
+            
+            progress_text = ", ".join(progress_parts)
+            st.info(f"🔍 Searching: {progress_text}")
+            st.progress((i + 1) / len(searchable_secondary))
+    
+    # Clear progress bar after completion
+    st.session_state.secondary_progress_container.empty()
+    
+    st.session_state.secondary_search_done = True
+    with digital_container:
+        show_discogs_and_revibed_block(
+            st.session_state.results_discogs,
+            st.session_state.track_for_search,
+            st.session_state.results_revibed
+        )
+
 # Display cached results if search already done and cache is valid
 elif st.session_state.suche_gestartet and app_state.is_cache_valid():
     if st.session_state.show_digital and st.session_state.digital_search_done:
@@ -643,6 +743,28 @@ elif st.session_state.suche_gestartet and app_state.is_cache_valid():
                 st.session_state.track_for_search,
                 st.session_state.results_revibed
             )
+
+# Mode switch buttons - placed at the very end, outside all containers
+if (st.session_state.get("digital_search_done", False) and 
+    st.session_state.get("has_digital_hits", False) and 
+    can_search_secondary and
+    st.session_state.get("show_digital", True)):
+    
+    if not st.session_state.get("secondary_search_done", False):
+        # First time - show search button
+        print("🔄 DEBUG: Adding search button for Discogs/Revibed")
+        if st.button("🔄 Search on Discogs and Revibed", key="final_switch", type="primary"):
+            print("🔄 DEBUG: Search button clicked!")
+            st.session_state.trigger_secondary_search = True
+            st.rerun()
+    else:
+        # Secondary search already done - show switch button for cached results
+        print("🔄 DEBUG: Adding switch button for cached Discogs/Revibed results")
+        if st.button("🔄 Switch to Discogs and Revibed", key="switch_cached", type="secondary"):
+            print("🔄 DEBUG: Switch to cached results clicked!")
+            # Set flag to trigger clean switch
+            st.session_state.switch_to_cached_secondary = True
+            st.rerun()
 
 
 # # ganz unten, oberhalb des Endes von main.py

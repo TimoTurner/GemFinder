@@ -1,5 +1,149 @@
 # ui_helpers.py
 
+def show_live_results():
+    """Display live search results as they come in from parallel threads"""
+    import streamlit as st
+    
+    live_results = st.session_state.get("live_results", [])
+    
+    # Always show progress bar when search is started, even with no results yet
+    if not live_results and st.session_state.get("suche_gestartet", False):
+        # Use single persistent progress display
+        if "live_progress_container" not in st.session_state:
+            st.session_state.live_progress_container = st.empty()
+        
+        with st.session_state.live_progress_container.container():
+            st.info("🔍 Starting search...")
+            st.progress(0)  # Show 0% progress bar immediately
+        return
+    elif not live_results:
+        return
+    
+    # Show progress bar with platform status
+    platform_status = {}
+    total_platforms = 4  # iTunes, Beatport, Bandcamp, Traxsource
+    
+    for result in live_results:
+        platform = result.get("platform", "Unknown")
+        title = result.get("title", "")
+        
+        # Check if this is a real result or error
+        if title.lower() in ["kein treffer", "fehler", "", "❌ fehler"]:
+            platform_status[platform] = "❌"
+        elif "nicht verfügbar" in title.lower():
+            platform_status[platform] = "⚠️"
+        else:
+            platform_status[platform] = "✅"
+    
+    # Build progress string
+    progress_parts = []
+    for platform in ["iTunes", "Beatport", "Bandcamp", "Traxsource"]:
+        status = platform_status.get(platform, "⏳")
+        progress_parts.append(f"{platform} {status}")
+    
+    progress_text = ", ".join(progress_parts)
+    
+    # Use single persistent progress display
+    if "live_progress_container" not in st.session_state:
+        st.session_state.live_progress_container = st.empty()
+    
+    with st.session_state.live_progress_container.container():
+        st.info(f"🔍 Searching: {progress_text}")
+        
+        completed_count = len([p for p in platform_status.values() if p in ["✅", "❌", "⚠️"]])
+        if completed_count > 0:
+            st.progress(completed_count / total_platforms)
+    
+    # Show digital results immediately as they come in (each platform only once)
+    PLACEHOLDER_COVER = "cover_placeholder.png"
+    NO_HIT_COVER = "not_found.png"
+    
+    # Initialize containers for each platform if not exists
+    if "live_results_containers" not in st.session_state:
+        st.session_state.live_results_containers = {}
+        st.session_state.live_results_header_shown = False
+    
+    # Show header only once
+    if live_results and not st.session_state.live_results_header_shown:
+        st.markdown("#### Digital Results")
+        st.session_state.live_results_header_shown = True
+    
+    # Display only NEW results (not already displayed)
+    displayed_platforms = set(st.session_state.live_results_containers.keys())
+    
+    for entry in live_results:
+        platform_str = entry.get("platform", "")
+        
+        # Skip if this platform was already displayed
+        if platform_str in displayed_platforms:
+            continue
+            
+        # Create container for this platform
+        st.session_state.live_results_containers[platform_str] = st.empty()
+        
+        # Display this platform's result
+        with st.session_state.live_results_containers[platform_str].container():
+            title_str = str(entry.get("title", ""))
+            artist_str = str(entry.get("artist", ""))
+            album_str = str(entry.get("album", ""))
+            label_raw = entry.get("label", "")
+            label_str = label_raw[0] if isinstance(label_raw, list) and label_raw else str(label_raw)
+            price_str = str(entry.get("price", ""))
+            cover_url = entry.get("cover_url", "") or entry.get("cover", "")
+            release_url = entry.get("url", "").strip()
+            
+            # Image selection - show NO_HIT_COVER for no results, PLACEHOLDER for valid results without cover
+            is_real_hit = is_valid_result(entry, check_empty_title=False)
+            if not cover_url or not cover_url.strip():
+                cover_url = PLACEHOLDER_COVER if is_real_hit else NO_HIT_COVER
+            
+            # Display result
+            cols = st.columns([1, 5])
+            with cols[0]:
+                st.image(cover_url, width=92)
+            with cols[1]:
+                if release_url:
+                    st.markdown(f"[**{platform_str}**]({release_url})")
+                else:
+                    from utils import get_platform_info
+                    platform_url, _ = get_platform_info(platform_str)
+                    st.markdown(f"[**{platform_str}**]({platform_url})")
+                
+                st.markdown(f"**{title_str}**")
+                if artist_str:
+                    st.markdown(f"{artist_str}")
+                if album_str:
+                    st.markdown(f"*{album_str}*")
+                if label_str:
+                    st.markdown(f"`{label_str}`")
+                if price_str and release_url:
+                    st.markdown(f"[{price_str}]({release_url})")
+                elif price_str:
+                    st.markdown(f":green[{price_str}]")
+                
+                # Preview functionality for iTunes
+                if entry.get("preview") and is_real_hit:
+                    st.audio(entry["preview"], format="audio/mp4")
+            
+            st.markdown("---")
+    
+    # Show mode switch button when there are digital hits (at least 1 real result)
+    if st.session_state.get("digital_search_done", False):
+        # Clear progress container when showing final digital results
+        if "live_progress_container" in st.session_state:
+            st.session_state.live_progress_container.empty()
+        
+        # Check if there are real hits
+        real_hits = [
+            r for r in st.session_state.get("live_results", [])
+            if (r.get("title") or "").strip().lower() not in ("kein treffer", "", "fehler")
+        ]
+        
+        # Button logic moved to main.py to avoid state issues
+        # Just store that we have hits for main.py to use
+        if len(real_hits) > 0:
+            st.session_state.has_digital_hits_for_button = True
+
 import streamlit as st
 from scrape_search import search_revibed, scrape_discogs_marketplace_offers
 from selenium_scraper import selenium_filter_offers_parallel
@@ -581,249 +725,6 @@ def display_single_offer_clean(offer, index, preferred_currency, selected_releas
             st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid #eee;'>", 
                        unsafe_allow_html=True)
 
-def show_live_results():
-    """Display live search results as they come in from parallel threads"""
-    import streamlit as st
-    
-    live_results = st.session_state.get("live_results", [])
-    
-    # Always show progress bar when search is started, even with no results yet
-    if not live_results and st.session_state.get("suche_gestartet", False):
-        # Use single persistent progress display
-        if "live_progress_container" not in st.session_state:
-            st.session_state.live_progress_container = st.empty()
-        
-        with st.session_state.live_progress_container.container():
-            st.info("🔍 Starting search...")
-            st.progress(0)  # Show 0% progress bar immediately
-        return
-    elif not live_results:
-        return
-    
-    # Show progress bar with platform status
-    platform_status = {}
-    total_platforms = 4  # iTunes, Beatport, Bandcamp, Traxsource
-    
-    for result in live_results:
-        platform = result.get("platform", "Unknown")
-        title = result.get("title", "")
-        
-        # Check if this is a real result or error
-        if title.lower() in ["kein treffer", "fehler", "", "❌ fehler"]:
-            platform_status[platform] = "❌"
-        elif "nicht verfügbar" in title.lower():
-            platform_status[platform] = "⚠️"
-        else:
-            platform_status[platform] = "✅"
-    
-    # Build progress string
-    progress_parts = []
-    for platform in ["iTunes", "Beatport", "Bandcamp", "Traxsource"]:
-        status = platform_status.get(platform, "⏳")
-        progress_parts.append(f"{platform} {status}")
-    
-    progress_text = ", ".join(progress_parts)
-    
-    # Use single persistent progress display
-    if "live_progress_container" not in st.session_state:
-        st.session_state.live_progress_container = st.empty()
-    
-    with st.session_state.live_progress_container.container():
-        st.info(f"🔍 Searching: {progress_text}")
-        
-        completed_count = len([p for p in platform_status.values() if p in ["✅", "❌", "⚠️"]])
-        if completed_count > 0:
-            st.progress(completed_count / total_platforms)
-    
-    # Show digital results immediately as they come in (each platform only once)
-    PLACEHOLDER_COVER = "cover_placeholder.png"
-    NO_HIT_COVER = "not_found.png"
-    
-    # Initialize containers for each platform if not exists
-    if "live_results_containers" not in st.session_state:
-        st.session_state.live_results_containers = {}
-        st.session_state.live_results_header_shown = False
-    
-    # Show header only once
-    if live_results and not st.session_state.live_results_header_shown:
-        st.markdown("#### Digital Results")
-        st.session_state.live_results_header_shown = True
-    
-    # Display only NEW results (not already displayed)
-    displayed_platforms = set(st.session_state.live_results_containers.keys())
-    
-    for entry in live_results:
-        platform_str = entry.get("platform", "")
-        
-        # Skip if this platform was already displayed
-        if platform_str in displayed_platforms:
-            continue
-            
-        # Create container for this platform
-        st.session_state.live_results_containers[platform_str] = st.empty()
-        
-        # Display this platform's result
-        with st.session_state.live_results_containers[platform_str].container():
-            title_str = str(entry.get("title", ""))
-            artist_str = str(entry.get("artist", ""))
-            album_str = str(entry.get("album", ""))
-            label_raw = entry.get("label", "")
-            label_str = label_raw[0] if isinstance(label_raw, list) and label_raw else str(label_raw)
-            price_str = str(entry.get("price", ""))
-            cover_url = entry.get("cover_url", "") or entry.get("cover", "")
-            release_url = entry.get("url", "").strip()
-            
-            # Image selection - show NO_HIT_COVER for no results, PLACEHOLDER for valid results without cover
-            is_real_hit = is_valid_result(entry, check_empty_title=False)
-            if not cover_url or not cover_url.strip():
-                cover_url = PLACEHOLDER_COVER if is_real_hit else NO_HIT_COVER
-            
-            # Display result
-            cols = st.columns([1, 5])
-            with cols[0]:
-                st.image(cover_url, width=92)
-            with cols[1]:
-                if release_url:
-                    st.markdown(f"[**{platform_str}**]({release_url})")
-                else:
-                    from utils import get_platform_info
-                    platform_url, _ = get_platform_info(platform_str)
-                    st.markdown(f"[**{platform_str}**]({platform_url})")
-                
-                st.markdown(f"**{title_str}**")
-                if artist_str:
-                    st.markdown(f"{artist_str}")
-                if album_str:
-                    st.markdown(f"*{album_str}*")
-                if label_str:
-                    st.markdown(f"`{label_str}`")
-                if price_str and release_url:
-                    st.markdown(f"[{price_str}]({release_url})")
-                elif price_str:
-                    st.markdown(f":green[{price_str}]")
-                
-                # Preview functionality for iTunes
-                if entry.get("preview") and is_real_hit:
-                    st.audio(entry["preview"], format="audio/mp4")
-            
-            st.markdown("---")
-    
-    # Show mode switch button when there are digital hits (at least 1 real result)
-    if st.session_state.get("digital_search_done", False):
-        # Check if there are real hits
-        real_hits = [
-            r for r in st.session_state.get("live_results", [])
-            if (r.get("title") or "").strip().lower() not in ("kein treffer", "", "fehler")
-        ]
-        
-        # DEBUG: Terminal output (only once when button check happens)
-        if len(st.session_state.get("live_results", [])) > 0:
-            print("🔍 DEBUG - Mode Switch Button conditions:")
-            print(f"  digital_search_done: {st.session_state.get('digital_search_done', False)}")
-            print(f"  has_digital_hits: {st.session_state.get('has_digital_hits', False)}")
-            print(f"  live_results count: {len(st.session_state.get('live_results', []))}")
-            print(f"  real_hits count: {len(real_hits)}")
-            print(f"  secondary_search_done: {st.session_state.get('secondary_search_done', False)}")
-            for i, hit in enumerate(real_hits[:3]):
-                print(f"    Real hit {i+1}: {hit.get('platform', 'Unknown')} - {hit.get('title', 'No title')}")
-        
-        if len(real_hits) > 0:
-            # Button logic: search vs switch mode based on cache
-            if not st.session_state.get("secondary_search_done", False):
-                # First time clicking - perform search
-                if st.button("Search on Discogs and Revibed", key="discogs_search_digital"):
-                    import time
-                    start_time = time.time()
-                    print(f"🕐 Mode Switch Button clicked - Starting secondary search")
-                    
-                    st.session_state.discogs_revibed_mode = True
-                    st.session_state.show_digital         = False
-                    
-                    # Show progress bar immediately
-                    progress_container = st.empty()
-                    with progress_container.container():
-                        st.info("🔍 Searching Discogs and Revibed...")
-                        progress_bar = st.progress(0)
-                    
-                    setup_time = time.time() - start_time
-                    print(f"🕐 Setup completed: {setup_time:.3f}s")
-                    
-                    # Import providers for search
-                    from providers import DiscogsProvider, RevibedProvider, SearchCriteria
-                    from state_manager import AppState
-                    
-                    # Get current criteria
-                    app_state = AppState()
-                    criteria = app_state.get_criteria()
-                    
-                    # Search Discogs (usually the slow one)
-                    discogs_start = time.time()
-                    with progress_container.container():
-                        st.info("🔍 Searching Discogs API...")
-                        progress_bar.progress(25)
-                    
-                    print(f"🕐 Starting Discogs search at {discogs_start - start_time:.3f}s")
-                    
-                    discogs_provider = DiscogsProvider()
-                    if discogs_provider.can_search(criteria):
-                        discogs_result = discogs_provider.search(criteria)
-                        st.session_state.results_discogs = discogs_result.get("releases", [])
-                    else:
-                        st.session_state.results_discogs = []
-                    
-                    discogs_end = time.time()
-                    discogs_duration = discogs_end - discogs_start
-                    print(f"🕐 Discogs search completed: {discogs_duration:.3f}s")
-                    
-                    # Update progress
-                    revibed_start = time.time()
-                    with progress_container.container():
-                        st.info("🔍 Searching Revibed...")
-                        progress_bar.progress(75)
-                    
-                    print(f"🕐 Starting Revibed search at {revibed_start - start_time:.3f}s")
-                    
-                    # Search Revibed  
-                    revibed_provider = RevibedProvider()
-                    if revibed_provider.can_search(criteria):
-                        revibed_result = revibed_provider.search(criteria)
-                        st.session_state.results_revibed = [revibed_result]
-                    else:
-                        st.session_state.results_revibed = [{
-                            'platform': 'Revibed',
-                            'title': 'Nicht gesucht (Angaben fehlen)',
-                            'artist': '', 'album': '', 'label': '', 'price': '',
-                            'cover_url': '', 'url': '', 'search_time': 0.0
-                        }]
-                    
-                    revibed_end = time.time()
-                    revibed_duration = revibed_end - revibed_start
-                    print(f"🕐 Revibed search completed: {revibed_duration:.3f}s")
-                    
-                    # Complete progress
-                    with progress_container.container():
-                        st.info("✅ Search completed!")
-                        progress_bar.progress(100)
-                    
-                    st.session_state.secondary_search_done = True
-                    
-                    total_time = time.time() - start_time
-                    print(f"🕐 Total secondary search time: {total_time:.3f}s")
-                    print(f"🕐 Breakdown - Setup: {setup_time:.3f}s, Discogs: {discogs_duration:.3f}s, Revibed: {revibed_duration:.3f}s")
-                    
-                    # Clear progress after short delay
-                    time.sleep(0.5)
-                    progress_container.empty()
-                    
-                    st.rerun()
-            else:
-                # Already searched - just switch view (cache mode)
-                if st.button("Switch to Discogs and Revibed", key="discogs_switch_digital"):
-                    st.session_state.discogs_revibed_mode = True
-                    st.session_state.show_digital         = False
-                    st.rerun()
-
-
 # show_digital_block() function removed - functionality moved to show_live_results()
     
     # COMMENTED OUT: Original duplicate display code
@@ -1224,6 +1125,21 @@ def show_discogs_and_revibed_block(releases, track_for_search, revibed_results):
     # Scenario 2 & 3: No digital hits -> no back button
     if st.session_state.get("has_digital_hits", False):
         if st.button("Zurück zu digitalen Shops", key="digital_back_revibed"):
+            print("🔄 DEBUG: Back button clicked - returning to digital results")
+            
+            # Increment container generation to force complete recreation
+            st.session_state.container_generation = st.session_state.get('container_generation', 0) + 1
+            
+            # Change flags
             st.session_state.discogs_revibed_mode = False
-            st.session_state.show_digital         = True
+            st.session_state.show_digital = True
+            
+            # Reset button flags so mode switch button can be shown again
+            st.session_state.mode_switch_button_shown = False
+            
+            # Clear all container states
+            for key in list(st.session_state.keys()):
+                if key.startswith(('live_results_', 'live_progress_', 'secondary_progress_')):
+                    del st.session_state[key]
+            
             st.rerun()

@@ -63,9 +63,13 @@ def show_live_results():
         st.session_state.live_results_containers = {}
         st.session_state.live_results_header_shown = False
     
-    # Show header only once
+    # Show header only once - render in a container so it can be cleared
+    if "live_results_header_container" not in st.session_state:
+        st.session_state.live_results_header_container = st.empty()
+    
     if live_results and not st.session_state.live_results_header_shown:
-        st.markdown("#### Digital Results")
+        with st.session_state.live_results_header_container.container():
+            st.markdown("#### Digital Results")
         st.session_state.live_results_header_shown = True
     
     # Display only NEW results (not already displayed)
@@ -858,6 +862,131 @@ def get_intensity_color(count, color_type):
         return f":{color_type}[{count}]"
 
 
+
+def show_discogs_block(releases, track_for_search):
+    """Display Discogs releases only"""
+    PLACEHOLDER_COVER = "cover_placeholder.png"
+    NO_HIT_COVER = "not_found.png"
+    
+    st.markdown("#### Discogs Releases")
+    
+    if releases:
+        # Release selection and display
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            # Radio button selection
+            selected_idx = st.radio(
+                "",  # Empty label
+                options=list(range(len(releases))),
+                index=st.session_state.get("release_selected_idx", 0),
+                format_func=lambda i: (
+                    f"{releases[i].get('title', '-')}"
+                    f" – {releases[i].get('label', ['-'])[0] if releases[i].get('label') else '-'}"
+                    f" ({releases[i].get('year', '-')})"
+                ),
+                key="discogs_release_select"
+            )
+            
+            # Check if selection changed and trigger rerun
+            if selected_idx != st.session_state.get("release_selected_idx", 0):
+                st.session_state.release_selected_idx = selected_idx
+                # Reset offers display when changing selection
+                st.session_state.show_offers = False
+                st.session_state.offers_for_release = None
+                st.rerun()
+            else:
+                st.session_state.release_selected_idx = selected_idx
+
+            # Cover and details for selected release
+            if selected_idx < len(releases):
+                r = releases[selected_idx]
+                
+                # Cover image
+                cover_url = r.get("cover_image") or r.get("cover") or r.get("thumb")
+                if not cover_url or not cover_url.strip():
+                    cover_url = PLACEHOLDER_COVER
+                st.image(cover_url, width=200)
+
+                # Detailed metadata
+                label_raw = r.get("label", ["-"])
+                label_str = label_raw[0] if isinstance(label_raw, list) and label_raw else str(label_raw)
+                format_list = r.get("format", [])
+                format_str = ", ".join(format_list) if isinstance(format_list, list) else str(format_list)
+                year_str = r.get("year", "-")
+                catno_str = r.get("catno", "-")
+                title_str = r.get("title", "-")
+
+                # Display detailed info
+                st.markdown(f"**{title_str}**")
+                st.markdown(f"**Label:** `{label_str}`")
+                st.markdown(f"**Jahr:** {year_str}")
+                st.markdown(f"**Format:** {format_str}")
+                st.markdown(f"**Katalog:** `{catno_str}`")
+                
+                # Search button for offers
+                search_button_key = f"search_offers_btn_{selected_idx}"
+                if st.button("Search for Offers", key=search_button_key):
+                    st.session_state.show_offers = True
+                    st.session_state.offers_for_release = selected_idx
+                    st.rerun()
+        
+        with col2:
+            st.markdown("#### Available offers in your currency")
+            # Offers display logic would go here
+            if st.session_state.get("show_offers") and st.session_state.get("offers_for_release") == selected_idx:
+                st.info("Offers functionality would be displayed here")
+            else:
+                st.info("Click 'Search for Offers' to see marketplace listings")
+        
+        st.markdown("---")
+    else:
+        st.image(NO_HIT_COVER, width=92)
+        st.info("Keine Discogs-Releases gefunden.")
+
+def show_revibed_block(revibed_results):
+    """Display Revibed results only"""
+    NO_HIT_COVER = "not_found.png"
+    
+    # Check if there are any real Revibed hits
+    def is_real_revibed_hit(entry):
+        return is_valid_result(entry, check_empty_title=True)
+    
+    real_revibed_hits = [r for r in revibed_results if is_real_revibed_hit(r)]
+    has_revibed_hits = len(real_revibed_hits) > 0
+    
+    st.markdown("#### Revibed Results")
+    
+    if has_revibed_hits:
+        for result in real_revibed_hits:
+            cover_url = result.get("cover_url", "")
+            title = result.get("title", "Unbekannt")
+            artist = result.get("artist", "Unbekannt")
+            price = result.get("price", "Preis nicht verfügbar")
+            url = result.get("url", "")
+            
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                if cover_url and cover_url.strip():
+                    st.image(cover_url, width=120)
+                else:
+                    st.image("cover_placeholder.png", width=120)
+            
+            with col2:
+                st.markdown(f"**{title}**")
+                st.markdown(f"**Artist:** {artist}")
+                st.markdown(f"**Preis:** {price}")
+                
+                if url:
+                    st.markdown(f"[🔗 Auf Revibed ansehen]({url})")
+    else:
+        # No hits styling
+        st.markdown("""
+        <div style="text-align:center; padding:2em;">
+            <div style="font-size:3em; margin-bottom:0.5em;">🎵</div>
+            <div style="color:#666;">Keine Treffer</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 def show_discogs_and_revibed_block(releases, track_for_search, revibed_results):
     PLACEHOLDER_COVER = "cover_placeholder.png"

@@ -249,14 +249,9 @@ def search_discogs_releases(artist=None, track=None, album=None, catno=None):
             data = response.json()
             results = data.get("results", [])
             
-            print(f"Found {len(results)} results from Discogs API")
-            
             # Convert API response to expected format
             formatted_results = []
             for i, result in enumerate(results[:10]):  # Always show first 10 results
-                # Debug: Print first few results to understand structure and filtering
-                if i < 3:
-                    print(f"Result {i+1}: {result}")
                 
                 # Accept both releases and masters (like browser does)
                 resource_url = result.get("resource_url", "")
@@ -295,9 +290,7 @@ def search_discogs_releases(artist=None, track=None, album=None, catno=None):
                     "community": result.get("community", {})  # Extract community data if availabl
                 })
             
-            print(f"Final formatted results count: {len(formatted_results)}")
-            for i, res in enumerate(formatted_results[:3]):
-                print(f"Formatted result {i+1}: ID={res['id']}, Title={res['title']}, Cover={res['cover']}")
+            # Formatted results ready
             
             return formatted_results
         else:

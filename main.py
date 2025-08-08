@@ -19,7 +19,7 @@ from providers import (
 from state_manager import AppState
 from ui_helpers import (
     show_live_results,
-    show_discogs_and_revibed_block, show_discogs_block, show_revibed_block
+    show_revibed_fragment, show_discogs_block
 )
 from utils import get_platform_info, is_fuzzy_match
 
@@ -596,7 +596,7 @@ if search_clicked or track_search_clicked:
                     if st.session_state.results_discogs:
                         show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
                     if st.session_state.results_revibed:
-                        show_revibed_block(st.session_state.results_revibed)
+                        show_revibed_fragment(st.session_state.results_revibed)
 
         # If only secondary platforms can search
         elif can_search_secondary:
@@ -618,7 +618,7 @@ if search_clicked or track_search_clicked:
                 if st.session_state.results_discogs:
                     show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
                 if st.session_state.results_revibed:
-                    show_revibed_block(st.session_state.results_revibed)
+                    show_revibed_fragment(st.session_state.results_revibed)
 
 # Reset when search criteria changed (cache invalid but search was started)
 elif st.session_state.suche_gestartet and not app_state.is_cache_valid():
@@ -726,7 +726,7 @@ if st.session_state.get("trigger_secondary_search", False) and can_search_second
             print("🔍 DEBUG: Revibed loaded - adding Revibed results...")
             # Add Revibed results to the display
             with digital_container:
-                show_revibed_block(st.session_state.results_revibed)
+                show_revibed_fragment(st.session_state.results_revibed)
     
     # Show back button after both results are loaded (same complex logic as original)
     if st.session_state.get("has_digital_hits", False):
@@ -793,13 +793,15 @@ elif st.session_state.suche_gestartet and app_state.is_cache_valid():
         print(f"🔍 DEBUG: NOT showing cached digital - show_digital={st.session_state.get('show_digital')}, discogs_mode={st.session_state.get('discogs_revibed_mode')}")
     
     if st.session_state.discogs_revibed_mode and st.session_state.secondary_search_done:
-        # Show cached secondary results  
+        # Show cached secondary results - now completely separated
         with digital_container:
-            show_discogs_and_revibed_block(
-                st.session_state.results_discogs,
-                st.session_state.track_for_search,
-                st.session_state.results_revibed
+            # Enhanced Discogs block (normal rendering)
+            show_discogs_block(
+                st.session_state.results_discogs, 
+                st.session_state.track_for_search
             )
+            # Revibed fragment (parallel loading)
+            show_revibed_fragment(st.session_state.results_revibed)
 
 # Mode switch buttons - placed at the very end, outside all containers
 if (st.session_state.get("digital_search_done", False) and 

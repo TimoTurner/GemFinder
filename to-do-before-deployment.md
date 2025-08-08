@@ -106,6 +106,68 @@ Implementiere als separates monitoring.py Modul mit CLI-Interface."
 
 ## 🚀 PERFORMANCE OPTIMIZATION
 
+### **CRITICAL: Resource Management für kommerzielle Nutzung**
+```
+Prompt: "Implementiere Thread-Pool-Management für hohe Last:
+
+1. **WebDriver Connection Pooling**:
+   - Limitiere gleichzeitige Chrome-Instanzen auf max 8-12
+   - Implementiere Queue-System für Scraper-Requests
+   - Automatic cleanup nach Timeout (30s) statt unbegrenzt
+   - Health-Check für Driver-Instanzen vor Wiederverwendung
+
+2. **Memory-Optimierung**:
+   - Session State auf max 50MB begrenzen pro User
+   - Garbage Collection für live_results nach 5 Minuten
+   - Image/Cover-URL Lazy Loading statt Prefetch
+   - Cache-TTL von max 1h für API-Responses
+
+3. **Rate Limiting Implementation**:
+   - iTunes API: max 200 req/min (Apple Limit beachten)
+   - Selenium Scraper: max 30 parallel requests
+   - Per-User Rate Limiting: 10 Searches/Minute
+   - Global Rate Limiting für Server-Protection
+
+4. **Threading-Kontrolle**:
+   - ThreadPoolExecutor auf max 4 Workers begrenzen 
+   - Timeout für alle Scraper auf 10s (statt unbegrenzt)
+   - Exception-Handling ohne App-Crash
+   - Thread-Monitoring und Cleanup-Mechanisms
+
+KRITISCH: Ohne diese Limits kann die App bei >50 concurrent users abstürzen!"
+```
+
+### **UI Performance & Stability**
+```
+Prompt: "Repariere Container-Management und Scroll-Verhalten:
+
+1. **Container-State-Management**:
+   - Vereinfache session_state von 28+ Keys auf <15 Keys
+   - Eliminiere container_generation Komplexität 
+   - Stable Container-IDs statt dynamische Generation
+   - Memory-Leaks in st.empty() Containern reparieren
+
+2. **Track-Selection UI Stabilisierung**:
+   - Scroll-Position preservation bei Track-Wechsel
+   - Debouncing für Multiple-Track-Selection (500ms)
+   - Container-Jumping bei Radio-Button-Clicks eliminieren
+   - Progressive Loading statt All-at-Once Rendering
+
+3. **Progress-Indicator Optimization**:
+   - Async Progress Updates ohne st.rerun() Spam
+   - Single Progress Container statt Multiple
+   - Smooth Transitions zwischen Search States
+   - Loading-State Consolidation
+
+4. **main.py Refactoring (KRITISCH)**:
+   - 841 Zeilen auf <400 Zeilen reduzieren
+   - Funktionen extrahieren: search_logic.py, ui_components.py
+   - Event-Handler separieren von UI-Rendering
+   - Clean Architecture Pattern implementieren
+
+ZIEL: Stabile UX auch bei 100+ concurrent users mit smooth scrolling"
+```
+
 ### **Caching Strategy**
 ```
 Prompt: "Optimiere die App-Performance durch intelligentes Caching:

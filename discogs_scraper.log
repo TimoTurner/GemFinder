@@ -736,3 +736,19 @@
 2025-08-04 22:19:55,528 - discogs_scraper - INFO - Successfully scraped 1 offers for release 1543120
 2025-08-04 22:20:17,241 - discogs_scraper - INFO - Scraping offers for release 322979
 2025-08-04 22:20:23,155 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-08 15:28:28,664 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-08 15:28:34,211 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-08 16:49:55,306 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-08 16:50:01,074 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-08 16:58:19,245 - discogs_scraper - INFO - Scraping offers for release 489201
+2025-08-08 16:58:25,502 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1740382840
+2025-08-08 16:58:25,554 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3649480191
+2025-08-08 16:58:25,589 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3457898808
+2025-08-08 16:58:25,623 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2714608573
+2025-08-08 16:58:25,657 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/900028561
+2025-08-08 16:58:25,689 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1560102229
+2025-08-08 16:58:25,722 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/51425878
+2025-08-08 16:58:25,754 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1865128858
+2025-08-08 16:58:25,754 - discogs_scraper - INFO - Successfully scraped 8 offers for release 489201
+2025-08-08 17:04:42,398 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-08 17:04:47,912 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979

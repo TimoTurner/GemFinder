@@ -26,4 +26,12 @@ git status
 
 ## Environment aktivieren:
 
-source ~/venv/bin/activate   
+source ~/venv/bin/activate
+
+
+
+1. Scanne alle Scripte im Ordner GemFinder und vergleiche die app mit den Anforderungen aus gem_finder_context.md und bewerte den aktuellen stand was noch zu tun ist in to-do-before-deployment
+2. Vergiss nicht an die Anforderungen zu denken vor jeder Antwort und Änderung von Code
+3. Stelle kritische Rückfragen an mich.
+4. Überlege immer ob die Änderungen die UX verbessern und ob die Änderungen die Performance maßgeblich beeinflusst bei kommerzieller Nutzung.
+5. Minimalinvasive Änderungen.

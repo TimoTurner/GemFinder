@@ -864,194 +864,22 @@ def get_intensity_color(count, color_type):
 
 
 def show_discogs_block(releases, track_for_search):
-    """Display Discogs releases only"""
+    """Enhanced Discogs block with all features - consolidated from combined version"""
     PLACEHOLDER_COVER = "cover_placeholder.png"
     NO_HIT_COVER = "not_found.png"
     
-    st.markdown("#### Discogs Releases")
-    
-    if releases:
-        # Release selection and display
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            # Radio button selection
-            selected_idx = st.radio(
-                "",  # Empty label
-                options=list(range(len(releases))),
-                index=st.session_state.get("release_selected_idx", 0),
-                format_func=lambda i: (
-                    f"{releases[i].get('title', '-')}"
-                    f" – {releases[i].get('label', ['-'])[0] if releases[i].get('label') else '-'}"
-                    f" ({releases[i].get('year', '-')})"
-                ),
-                key="discogs_release_select"
-            )
-            
-            # Check if selection changed and trigger rerun
-            if selected_idx != st.session_state.get("release_selected_idx", 0):
-                st.session_state.release_selected_idx = selected_idx
-                # Reset offers display when changing selection
-                st.session_state.show_offers = False
-                st.session_state.offers_for_release = None
-                st.rerun()
-            else:
-                st.session_state.release_selected_idx = selected_idx
-
-            # Cover and details for selected release
-            if selected_idx < len(releases):
-                r = releases[selected_idx]
-                
-                # Cover image
-                cover_url = r.get("cover_image") or r.get("cover") or r.get("thumb")
-                if not cover_url or not cover_url.strip():
-                    cover_url = PLACEHOLDER_COVER
-                st.image(cover_url, width=200)
-
-                # Detailed metadata
-                label_raw = r.get("label", ["-"])
-                label_str = label_raw[0] if isinstance(label_raw, list) and label_raw else str(label_raw)
-                format_list = r.get("format", [])
-                format_str = ", ".join(format_list) if isinstance(format_list, list) else str(format_list)
-                year_str = r.get("year", "-")
-                catno_str = r.get("catno", "-")
-                title_str = r.get("title", "-")
-
-                # Display detailed info
-                st.markdown(f"**{title_str}**")
-                st.markdown(f"**Label:** `{label_str}`")
-                st.markdown(f"**Jahr:** {year_str}")
-                st.markdown(f"**Format:** {format_str}")
-                st.markdown(f"**Katalog:** `{catno_str}`")
-                
-                # Search button for offers
-                search_button_key = f"search_offers_btn_{selected_idx}"
-                if st.button("Search for Offers", key=search_button_key):
-                    st.session_state.show_offers = True
-                    st.session_state.offers_for_release = selected_idx
-                    st.rerun()
-        
-        with col2:
-            st.markdown("#### Available offers in your currency")
-            # Offers display logic would go here
-            if st.session_state.get("show_offers") and st.session_state.get("offers_for_release") == selected_idx:
-                st.info("Offers functionality would be displayed here")
-            else:
-                st.info("Click 'Search for Offers' to see marketplace listings")
-        
-        st.markdown("---")
-    else:
-        st.image(NO_HIT_COVER, width=92)
-        st.info("Keine Discogs-Releases gefunden.")
-
-def show_revibed_block(revibed_results):
-    """Display Revibed results only"""
-    NO_HIT_COVER = "not_found.png"
-    
-    # Check if there are any real Revibed hits
-    def is_real_revibed_hit(entry):
-        return is_valid_result(entry, check_empty_title=True)
-    
-    real_revibed_hits = [r for r in revibed_results if is_real_revibed_hit(r)]
-    has_revibed_hits = len(real_revibed_hits) > 0
-    
-    st.markdown("#### Revibed Results")
-    
-    if has_revibed_hits:
-        for result in real_revibed_hits:
-            cover_url = result.get("cover_url", "")
-            title = result.get("title", "Unbekannt")
-            artist = result.get("artist", "Unbekannt")
-            price = result.get("price", "Preis nicht verfügbar")
-            url = result.get("url", "")
-            
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                if cover_url and cover_url.strip():
-                    st.image(cover_url, width=120)
-                else:
-                    st.image("cover_placeholder.png", width=120)
-            
-            with col2:
-                st.markdown(f"**{title}**")
-                st.markdown(f"**Artist:** {artist}")
-                st.markdown(f"**Preis:** {price}")
-                
-                if url:
-                    st.markdown(f"[🔗 Auf Revibed ansehen]({url})")
-    else:
-        # No hits styling
-        st.markdown("""
-        <div style="text-align:center; padding:2em;">
-            <div style="font-size:3em; margin-bottom:0.5em;">🎵</div>
-            <div style="color:#666;">Keine Treffer</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-def show_discogs_and_revibed_block(releases, track_for_search, revibed_results):
-    PLACEHOLDER_COVER = "cover_placeholder.png"
-    NO_HIT_COVER      = "not_found.png"
-
-    # Check if there are any Revibed hits for display logic
-    # Use unified hit detection  
-    def is_real_revibed_hit(entry):
-        return is_valid_result(entry, check_empty_title=True)
-    
-    real_revibed_hits = [r for r in revibed_results if is_real_revibed_hit(r)]
-    has_revibed_hits = len(real_revibed_hits) > 0
-    
-    # Scenario 4: No hits anywhere: user must check his input
-    if not has_revibed_hits and not st.session_state.get("has_digital_hits", False) and not releases:
-        st.error("❌ **Keine Treffer gefunden auf allen Plattformen**")
-        st.markdown("""
-            <div style="text-align:center; margin-top:1em; margin-bottom:2em; padding:1em; background-color:#f8f9fa; border-radius:10px; border-left:4px solid #dc3545;">
-                <div style="font-size:1.2em; color:#dc3545; margin-bottom:0.5em;">
-                    📝 Bitte überprüfe deine Eingaben:
-                </div>
-                <div style="color:#6c757d;">
-                    • Schreibweise von Artist/Track/Album<br>
-                    • Vollständige Namen verwenden<br>
-                    • Alternative Schreibweisen probieren<br>
-                    • Weniger spezifische Suchbegriffe nutzen
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        if st.button("🔄 Reset Search", key="reset_search_no_hits"):
-            # Reset all search states
-            st.session_state.suche_gestartet = False
-            st.session_state.digital_search_done = False
-            st.session_state.secondary_search_done = False
-            st.session_state.has_digital_hits = False
-            st.session_state.show_digital = True
-            st.session_state.discogs_revibed_mode = False
-            st.session_state.results_digital = []
-            st.session_state.results_discogs = []
-            st.session_state.results_revibed = []
-            st.rerun()
-           # Scenario 3: No digital, no Revibed hits - show Gem GIF
-    elif not has_revibed_hits and not st.session_state.get("has_digital_hits", False):
-        st.markdown("""
-            <div style="text-align:center; margin-top:2em; margin-bottom:2em;">
-                <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExaHN1YWc1ZjgwdDg0bnd6eXRqbmM4bG9ndmh4ZDYybWJqOTFoZjQ2YiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/trHKezeRU0OPRyVYvI/giphy.gif"
-                     style="width: 180px; border-radius:30px;" alt="Diamond Gem" />
-                <div style="font-size:2em; color:#17e6ff; font-weight:bold; margin-top:0.5em; letter-spacing:0.05em; text-shadow: 0 0 20px #89ffff;">
-                    You found a true gem
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    # --- Discogs-Block ---
-    # Headers on same line
+    # Enhanced headers on same line (from combined version)
     header_col1, header_col2 = st.columns([1, 1])
     with header_col1:
         st.markdown("#### Discogs Releases")
     with header_col2:
         st.markdown("#### Available offers in your currency")
     
+    # Debug info for monitoring (from combined version)
     print(f"UI: Received {len(releases)} releases from API")
     for i, r in enumerate(releases[:3]):
         print(f"UI Release {i+1}: ID={r.get('id')}, Title={r.get('title')}")
+    
     if releases:
         # Two-column layout: Release info on left, offers on right
         release_col, offers_col = st.columns([1, 1])
@@ -1211,7 +1039,22 @@ def show_discogs_and_revibed_block(releases, track_for_search, revibed_results):
         st.image(NO_HIT_COVER, width=92)
         st.info("Keine Discogs-Releases gefunden.")
 
-    # --- Revibed-Block ---
+# Legacy show_revibed_block() removed - now using unified show_revibed_fragment() everywhere
+
+# Legacy combined function removed - now fully separated into:
+# - show_discogs_block() for enhanced Discogs display
+# - show_revibed_fragment() for parallel Revibed loading
+
+@st.fragment(run_every=2)
+def show_revibed_fragment(revibed_results):
+    """Pure Revibed fragment with back button - enables parallel loading"""
+    # Check if there are any Revibed hits for display logic
+    def is_real_revibed_hit(entry):
+        return is_valid_result(entry, check_empty_title=True)
+    
+    real_revibed_hits = [r for r in revibed_results if is_real_revibed_hit(r)]
+    has_revibed_hits = len(real_revibed_hits) > 0
+    
     st.markdown("#### Revibed: Treffer zu Artist und Release")
     
     if has_revibed_hits:
@@ -1256,19 +1099,8 @@ def show_discogs_and_revibed_block(releases, track_for_search, revibed_results):
         if st.button("Zurück zu digitalen Shops", key="digital_back_revibed"):
             print("🔄 DEBUG: Back button clicked - returning to digital results")
             
-            # Increment container generation to force complete recreation
-            st.session_state.container_generation = st.session_state.get('container_generation', 0) + 1
-            
-            # Change flags
+            # Fragment-safe state changes (no aggressive clearing)
             st.session_state.discogs_revibed_mode = False
             st.session_state.show_digital = True
-            
-            # Reset button flags so mode switch button can be shown again
             st.session_state.mode_switch_button_shown = False
-            
-            # Clear all container states
-            for key in list(st.session_state.keys()):
-                if key.startswith(('live_results_', 'live_progress_', 'secondary_progress_')):
-                    del st.session_state[key]
-            
-            st.rerun()
+            # Fragment will handle the rest automatically

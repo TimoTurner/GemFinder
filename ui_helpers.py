@@ -976,14 +976,9 @@ def show_discogs_block(releases, track_for_search):
                 if url:
                     st.markdown(f"[Discogs Release →](https://www.discogs.com{url})")
 
-        # Show offers in right column when button is clicked
+        # Show offers in right column using fragment for auto-update
         with offers_col:
-            if (selected_idx < len(releases) and 
-                st.session_state.get("show_offers", False) and 
-                st.session_state.get("offers_for_release") == selected_idx):
-                search_discogs_offers_simplified(releases[selected_idx])
-            elif selected_idx < len(releases):
-                st.info("Click 'Search for Offers' to see marketplace listings")
+            show_offers_fragment(releases, selected_idx)
 
         # Show full tracklist in the release column
         if selected_idx < len(releases):
@@ -1033,7 +1028,7 @@ def show_discogs_block(releases, track_for_search):
                 if st.button("Search for Offers", key=search_button_key):
                     st.session_state.show_offers = True
                     st.session_state.offers_for_release = selected_idx
-                    st.rerun()
+                    # st.rerun() KOMPLETT ENTFERNT - teste was passiert
         st.markdown("---")
     else:
         st.image(NO_HIT_COVER, width=92)
@@ -1044,6 +1039,20 @@ def show_discogs_block(releases, track_for_search):
 # Legacy combined function removed - now fully separated into:
 # - show_discogs_block() for enhanced Discogs display
 # - show_revibed_fragment() for parallel Revibed loading
+
+@st.fragment(run_every=0.05)
+def show_offers_fragment(releases, selected_idx):
+    """Fragment für Offers-Anzeige - 50ms Update-Zyklus für sofortige Reaktion"""
+    # Track state changes for immediate updates
+    offers_state = st.session_state.get("show_offers", False)
+    offers_release = st.session_state.get("offers_for_release", None)
+    
+    if (selected_idx < len(releases) and 
+        offers_state and 
+        offers_release == selected_idx):
+        search_discogs_offers_simplified(releases[selected_idx])
+    elif selected_idx < len(releases):
+        st.info("Click 'Search for Offers' to see marketplace listings")
 
 @st.fragment(run_every=2)
 def show_revibed_fragment(revibed_results):

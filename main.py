@@ -90,6 +90,10 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
+# Clear render flags from previous script run
+if "discogs_rendered_this_run" in st.session_state:
+    del st.session_state.discogs_rendered_this_run
+
 # Store scroll position in session state
 if "scroll_position" not in st.session_state:
     st.session_state.scroll_position = 0
@@ -594,6 +598,7 @@ if search_clicked or track_search_clicked:
                 # Show results separately for better user experience
                 with digital_container:
                     if st.session_state.results_discogs:
+                        print(f"🌟 DEBUG MAIN: Calling show_discogs_block from line 597 (first search area)")
                         show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
                     if st.session_state.results_revibed:
                         show_revibed_fragment(st.session_state.results_revibed)
@@ -616,6 +621,7 @@ if search_clicked or track_search_clicked:
             # Show results separately for better user experience
             with digital_container:
                 if st.session_state.results_discogs:
+                    print(f"🌟 DEBUG MAIN: Calling show_discogs_block from line 619 (second search area)")
                     show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
                 if st.session_state.results_revibed:
                     show_revibed_fragment(st.session_state.results_revibed)
@@ -728,39 +734,6 @@ if st.session_state.get("trigger_secondary_search", False) and can_search_second
             with digital_container:
                 show_revibed_fragment(st.session_state.results_revibed)
     
-    # Show back button after both results are loaded (same complex logic as original)
-    if st.session_state.get("has_digital_hits", False):
-        if st.button("Zurück zu digitalen Shops", key="back_to_digital_after_secondary"):
-            print("🔄 DEBUG: Back button clicked - returning to digital results")
-            
-            # Increment container generation to force complete recreation
-            old_generation = st.session_state.get('container_generation', 0)
-            st.session_state.container_generation = old_generation + 1
-            
-            # Clear all display flags for the old generation
-            keys_to_clear = []
-            for key in st.session_state.keys():
-                if key.startswith(f'secondary_displayed_{old_generation}'):
-                    keys_to_clear.append(key)
-            for key in keys_to_clear:
-                del st.session_state[key]
-            
-            # Change flags
-            st.session_state.discogs_revibed_mode = False
-            st.session_state.show_digital = True
-            
-            # Reset button flags so mode switch button can be shown again
-            st.session_state.mode_switch_button_shown = False
-            if 'back_button_rendered' in st.session_state:
-                st.session_state.back_button_rendered = False
-            
-            # Clear all container states
-            for key in list(st.session_state.keys()):
-                if key.startswith(('live_results_', 'live_progress_', 'secondary_progress_')):
-                    del st.session_state[key]
-            
-            st.rerun()
-        
         # Update progress after completion
         with st.session_state.live_progress_container.container():
             progress_parts = []
@@ -793,9 +766,11 @@ elif st.session_state.suche_gestartet and app_state.is_cache_valid():
         print(f"🔍 DEBUG: NOT showing cached digital - show_digital={st.session_state.get('show_digital')}, discogs_mode={st.session_state.get('discogs_revibed_mode')}")
     
     if st.session_state.discogs_revibed_mode and st.session_state.secondary_search_done:
+        print(f"🌟 DEBUG MAIN: Entering cached secondary results block (line 764)")
         # Show cached secondary results - now completely separated
         with digital_container:
             # Enhanced Discogs block (normal rendering)
+            print(f"🌟 DEBUG MAIN: Calling show_discogs_block from line 766 (cached results)")
             show_discogs_block(
                 st.session_state.results_discogs, 
                 st.session_state.track_for_search

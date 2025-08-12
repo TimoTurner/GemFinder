@@ -73,16 +73,20 @@ class RevibedProvider(SearchProvider):
         return bool(c.album or c.artist)
 
     def search(self, c: SearchCriteria) -> dict:
-        # search_revibed nimmt (artist, album)-Parameter
-        artist = "" if c.album else c.artist
-        hits = search_revibed(artist, c.album)
+        # search_revibed takes (artist, album) parameters
+        # Priority: Album first, then Artist (as per Revibed search logic)
+        print(f"RevibedProvider: Searching with artist='{c.artist}', album='{c.album}'")
+        hits = search_revibed(c.artist, c.album)
         first = hits[0] if hits else {}
+        
+        print(f"RevibedProvider: Got {len(hits)} results, first result: {first}")
+        
         return {
             "platform":  self.name,
             "title":     first.get("title","Kein Treffer"),
             "artist":    first.get("artist", c.artist),
             "album":     first.get("album", c.album),
-            "label":     (first.get("label") or [""])[0],
+            "label":     first.get("label", ""),  # Fixed: handle string labels properly
             "price":     first.get("price",""),
             "cover_url": first.get("cover_url",""),
             "url":       first.get("url",""),

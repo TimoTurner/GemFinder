@@ -592,6 +592,7 @@ if search_clicked or track_search_clicked:
                         if p.name == "Discogs":
                             st.session_state.results_discogs = result.get("releases", [])  # Extract releases list from dict
                         elif p.name == "Revibed":
+                            print(f"🔍 DEBUG: Revibed search result: {result}")
                             st.session_state.results_revibed = [result]
                 
                 st.session_state.secondary_search_done = True
@@ -667,92 +668,39 @@ if st.session_state.get("trigger_secondary_search", False) and can_search_second
     print("🔄 DEBUG: Mode switch triggered - starting secondary search")
     st.session_state.trigger_secondary_search = False  # Reset flag
     
-    # Clear containers to remove verblasste results and header (keep progress container for secondary search)
-    live_container.empty()  # This removes the "Digital Results" header and any content in live_container
-    digital_container.empty()  # Clear digital container as well
+    # Initialize fragment timing for loading indicator
+    import time
+    st.session_state.revibed_fragment_start_time = time.time()
     
-    if "live_results_containers" in st.session_state:
-        for container in st.session_state.live_results_containers.values():
-            container.empty()
-    
-    # Clear the header container as well
-    if "live_results_header_container" in st.session_state:
-        st.session_state.live_results_header_container.empty()
-    
-    print("🔄 DEBUG: All result containers cleared including header, progress container kept for secondary search")
-    
-    # Switch to secondary mode
+    # DON'T clear containers immediately - let them fade gracefully
+    # Instead, just switch mode flags and start search
     st.session_state.discogs_revibed_mode = True
     st.session_state.show_digital = False
     
-    # Use the same progress container as digital search for consistent UI position
-    if "live_progress_container" not in st.session_state:
-        st.session_state.live_progress_container = st.empty()
-    
-    # Show progress bar with platform status (same as digital search)
-    searchable_secondary = [p for p in secondary_providers if p.can_search(criteria)]
-    
-    # Ensure Discogs comes first for better user experience (~0.3s vs ~2s)
-    searchable_secondary.sort(key=lambda p: 0 if p.name == "Discogs" else 1)
-    
-    with st.session_state.live_progress_container.container():
-        progress_text = ", ".join([f"{p.name} ⏳" for p in searchable_secondary])
-        st.info(f"🔍 Searching: {progress_text}")
-        st.progress(0)
-    
-    # Search secondary platforms sequentially (Discogs first, then Revibed)
-    for i, p in enumerate(searchable_secondary):
-        print(f"🔍 DEBUG: Searching {p.name}...")
+    # Start secondary search in background without clearing existing results
+    # This allows Revibed fragment to continue running if already started
+    if not st.session_state.get("secondary_search_done", False):
+        # Search secondary platforms
+        for p in secondary_providers:
+            if p.can_search(criteria):
+                result = p.search(criteria)
+                if p.name == "Discogs":
+                    st.session_state.results_discogs = result.get("releases", [])
+                elif p.name == "Revibed":
+                    st.session_state.results_revibed = [result]
         
-        # Update progress during search
-        with st.session_state.live_progress_container.container():
-            progress_parts = []
-            for j, provider in enumerate(searchable_secondary):
-                if j < i:
-                    progress_parts.append(f"{provider.name} ✅")
-                elif j == i:
-                    progress_parts.append(f"{provider.name} ⏳")
-                else:
-                    progress_parts.append(f"{provider.name} ⏳")
-            
-            progress_text = ", ".join(progress_parts)
-            st.info(f"🔍 Searching: {progress_text}")
-            st.progress((i + 0.5) / len(searchable_secondary))
-        
-        # Perform search
-        result = p.search(criteria)
-        if p.name == "Discogs":
-            st.session_state.results_discogs = result.get("releases", [])
-            print("🔍 DEBUG: Discogs loaded - showing Discogs results while Revibed continues...")
-            # Show Discogs results immediately
-            with digital_container:
-                show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
-        elif p.name == "Revibed":
-            st.session_state.results_revibed = [result]
-            print("🔍 DEBUG: Revibed loaded - adding Revibed results...")
-            # Add Revibed results to the display
-            with digital_container:
-                show_revibed_fragment(st.session_state.results_revibed)
+        st.session_state.secondary_search_done = True
     
-        # Update progress after completion
-        with st.session_state.live_progress_container.container():
-            progress_parts = []
-            for j, provider in enumerate(searchable_secondary):
-                if j <= i:
-                    progress_parts.append(f"{provider.name} ✅")
-                else:
-                    progress_parts.append(f"{provider.name} ⏳")
-            
-            progress_text = ", ".join(progress_parts)
-            st.info(f"🔍 Searching: {progress_text}")
-            st.progress((i + 1) / len(searchable_secondary))
+    # Clear containers AFTER search is complete to avoid interrupting fragments
+    live_container.empty()
+    digital_container.empty()
     
-    # Clear progress bar after completion
-    st.session_state.live_progress_container.empty()
-    
-    st.session_state.secondary_search_done = True
-    st.session_state.secondary_search_active = False  # Reset flag - secondary search complete
-    # Results are already displayed individually as they complete
+    # Show results in digital container
+    with digital_container:
+        if st.session_state.results_discogs:
+            show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
+        if st.session_state.results_revibed:
+            show_revibed_fragment(st.session_state.results_revibed)
 
 # Display cached results if search already done and cache is valid
 elif st.session_state.suche_gestartet and app_state.is_cache_valid():

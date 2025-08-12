@@ -1277,13 +1277,14 @@ def scrape_discogs_marketplace_offers(
         offers = raw.get("offers", [])
         filtered = []
 
-        # Nur Angebote in preferred_currency übernehmen
+        # Process all offers, prioritize preferred_currency but include others too
+        preferred_offers = []
+        other_offers = []
+        
         for o in offers:
             price_amt, price_curr = parse_price(o.get("price", ""))
-            if price_curr != preferred_currency:
-                continue
-
             shipping_amt, _ = parse_price(o.get("shipping", ""))
+            
             item = o.copy()
             item.update({
                 "price_amount":    price_amt,
@@ -1291,8 +1292,24 @@ def scrape_discogs_marketplace_offers(
                 "shipping_amount": shipping_amt,
                 "total_amount":    price_amt + shipping_amt
             })
-            filtered.append(item)
+            
+            # Separate preferred currency offers from others
+            if price_curr == preferred_currency:
+                preferred_offers.append(item)
+            else:
+                other_offers.append(item)
+        
+        # Return preferred currency first, then others (up to max_offers total)
+        filtered = preferred_offers + other_offers
+        if max_offers and len(filtered) > max_offers:
+            filtered = filtered[:max_offers]
 
+        # Debug logging
+        print(f"💰 Currency filtering: {len(offers)} total offers")
+        print(f"💰 Preferred currency ({preferred_currency}): {len(preferred_offers)} offers")
+        print(f"💰 Other currencies: {len(other_offers)} offers")
+        print(f"💰 Returning: {len(filtered)} offers total")
+        
         return filtered
 
     except ImportError:

@@ -63,6 +63,10 @@ class AppState:
         st.session_state.results_digital = []
         st.session_state.results_discogs = []
         st.session_state.results_revibed = []
+        
+        # Clear persistent Revibed timer when invalidating cache
+        if "revibed_search_start_time" in st.session_state:
+            del st.session_state["revibed_search_start_time"]
 
     def get_criteria_hash(self) -> str:
         """Generate hash of current search criteria for cache validation"""

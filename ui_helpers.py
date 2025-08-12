@@ -389,10 +389,19 @@ def search_discogs_offers_simplified(selected_release):
         st.error("Release-ID nicht gefunden.")
         return
     
-    # Load offers only if not already cached
+    # Load offers only if not already cached or being processed
     cache_key = f"all_offers_{release_id}"
+    loading_key = f"loading_offers_{release_id}"
+    
+    # Prevent multiple simultaneous requests for the same release
+    if loading_key in st.session_state:
+        st.info("⏳ Loading offers in progress...")
+        return
     
     if cache_key not in st.session_state:
+        # Mark as loading to prevent concurrent requests
+        st.session_state[loading_key] = True
+        
         # Show loading state only for initial load
         with st.spinner(f"Loading and filtering offers for shipping availability..."):
             try:
@@ -463,6 +472,10 @@ def search_discogs_offers_simplified(selected_release):
             except Exception as e:
                 st.error(f"❌ Error loading offers: {str(e)}")
                 return
+            finally:
+                # Always clear loading flag when done
+                if loading_key in st.session_state:
+                    del st.session_state[loading_key]
     
     # Apply quality filter on cached data (no reload, instant filtering)
     try:
@@ -477,8 +490,7 @@ def search_discogs_offers_simplified(selected_release):
         # Display offers directly (no stats, no buttons)
         if preferred_currency_offers:
             for i, offer in enumerate(preferred_currency_offers[:10], 1):
-                # Debug: Print offer URL to console
-                print(f"Offer {i} URL: {offer.get('offer_url', 'NO URL')}")
+                # Removed debug logging to reduce console noise
                 display_single_offer_clean(offer, i, preferred_currency, selected_release)
         else:
             quality_msg = " in VG+ or better condition" if high_quality_only else ""
@@ -885,9 +897,9 @@ def show_discogs_block(releases, track_for_search):
         release_col, offers_col = st.columns([1, 1])
         
         with release_col:
-            # Radio button selection without label
+            # Radio button selection with proper label
             selected_idx = st.radio(
-                "",  # Empty label
+                "Select a release:",
                 options=list(range(len(releases))),
                 index=st.session_state.get("release_selected_idx", 0),
                 format_func=lambda i: (
@@ -895,16 +907,17 @@ def show_discogs_block(releases, track_for_search):
                     f" – {releases[i].get('label', ['-'])[0] if releases[i].get('label') else '-'}"
                     f" ({releases[i].get('year', '-')})"
                 ),
-                key="release_select"
+                key="release_select",
+                label_visibility="collapsed"
             )
             
-            # Check if selection changed and trigger rerun
+            # Check if selection changed - NO RERUN to avoid stopping Revibed search
             if selected_idx != st.session_state.get("release_selected_idx", 0):
                 st.session_state.release_selected_idx = selected_idx
                 # Reset offers display when changing selection
                 st.session_state.show_offers = False
                 st.session_state.offers_for_release = None
-                st.rerun()
+                # Removed st.rerun() to prevent stopping parallel Revibed search
             else:
                 st.session_state.release_selected_idx = selected_idx
 
@@ -1040,23 +1053,50 @@ def show_discogs_block(releases, track_for_search):
 # - show_discogs_block() for enhanced Discogs display
 # - show_revibed_fragment() for parallel Revibed loading
 
-@st.fragment(run_every=0.05)
+@st.fragment(run_every=1)
 def show_offers_fragment(releases, selected_idx):
-    """Fragment für Offers-Anzeige - 50ms Update-Zyklus für sofortige Reaktion"""
+    """Fragment für Offers-Anzeige - optimized to reduce unnecessary executions"""
     # Track state changes for immediate updates
     offers_state = st.session_state.get("show_offers", False)
     offers_release = st.session_state.get("offers_for_release", None)
     
+    # Only run offers search if explicitly requested and not already cached
     if (selected_idx < len(releases) and 
         offers_state and 
         offers_release == selected_idx):
-        search_discogs_offers_simplified(releases[selected_idx])
+        
+        # Check if offers are already loaded to prevent repeated execution
+        release_id = releases[selected_idx].get("id", "unknown")
+        cache_key = f"all_offers_{release_id}"
+        
+        if cache_key not in st.session_state:
+            # First time loading - show the search function
+            search_discogs_offers_simplified(releases[selected_idx])
+        else:
+            # Already cached - just display without re-executing search logic
+            search_discogs_offers_simplified(releases[selected_idx])
     elif selected_idx < len(releases):
         st.info("Click 'Search for Offers' to see marketplace listings")
 
 @st.fragment(run_every=2)
 def show_revibed_fragment(revibed_results):
     """Pure Revibed fragment with back button - enables parallel loading"""
+    # Initialize persistent timer that survives fragment restarts
+    import time
+    current_time = time.time()
+    
+    # Use a dedicated, persistent key for timing that won't be affected by other session state changes
+    timer_key = "revibed_search_start_time"
+    
+    # Only set the start time ONCE when secondary search actually begins
+    if st.session_state.get("discogs_revibed_mode", False) and timer_key not in st.session_state:
+        st.session_state[timer_key] = current_time
+        print(f"🕐 REVIBED: Starting timer at {current_time}")
+    
+    # Calculate elapsed time from persistent start time
+    search_start = st.session_state.get(timer_key, current_time)
+    elapsed = current_time - search_start
+    
     # Check if there are any Revibed hits for display logic
     def is_real_revibed_hit(entry):
         return is_valid_result(entry, check_empty_title=True)
@@ -1066,8 +1106,38 @@ def show_revibed_fragment(revibed_results):
     
     st.markdown("#### Revibed: Treffer zu Artist und Release")
     
-    if has_revibed_hits:
-        # Style like digital releases
+    # Show loading in 10-second steps up to 1 minute
+    minimum_loading_time = 60.0  # 1 minute maximum
+    
+    # Only show loading if we just switched to secondary mode AND haven't completed the search yet
+    just_switched_to_secondary = st.session_state.get("trigger_secondary_search", False)
+    secondary_search_not_done = not st.session_state.get("secondary_search_done", False)
+    
+    still_loading = (st.session_state.get("discogs_revibed_mode", False) and 
+                     elapsed < minimum_loading_time and
+                     (just_switched_to_secondary or secondary_search_not_done) and
+                     not revibed_results)  # Don't show loading if we already have results
+    
+    if still_loading:
+        # Show loading indicator with 10-second step progress
+        step = int(elapsed // 10) + 1  # Which 10-second step we're in (1-6)
+        total_steps = 6  # 60 seconds / 10 seconds = 6 steps
+        progress_dots = "." * (step % 4)  # Animated dots (., .., ..., ....)
+        
+        if elapsed < 10:
+            st.info(f"🔍 Searching Revibed{progress_dots} (Step 1/6)")
+        elif elapsed < 20:
+            st.info(f"🔍 Searching Revibed{progress_dots} (Step 2/6)")
+        elif elapsed < 30:
+            st.info(f"🔍 Searching Revibed{progress_dots} (Step 3/6)")
+        elif elapsed < 40:
+            st.info(f"🔍 Searching Revibed{progress_dots} (Step 4/6)")
+        elif elapsed < 50:
+            st.info(f"🔍 Searching Revibed{progress_dots} (Step 5/6)")
+        else:
+            st.info(f"🔍 Searching Revibed{progress_dots} (Step 6/6 - Final step)")
+    elif has_revibed_hits:
+        # Show real valid results
         for entry in real_revibed_hits:
             st.markdown("""
                 <div style="margin-bottom:1.7em; border:1px solid #e2e6ed; border-radius:14px; padding:0.7em 1.1em; box-shadow:0 2px 16px #d8f7fd40;">
@@ -1091,13 +1161,14 @@ def show_revibed_fragment(revibed_results):
                 label=entry.get('label', ''),
                 price=entry.get('price', '')
             ), unsafe_allow_html=True)
-    else:
+    elif revibed_results:
+        # We have results but they're all "Kein Treffer" - show no results message
         st.markdown("""
             <div style="margin-bottom:1.7em; border:1px solid #e2e6ed; border-radius:14px; padding:0.7em 1.1em; box-shadow:0 2px 16px #d8f7fd40;">
                 <div style="font-size:1.1em; font-weight:bold; color:#1ad6cc; margin-bottom:0.5em;">
                     Revibed
                 </div>
-                <span style="color:#666;">Keine Treffer</span>
+                <span style="color:#666;">Keine Treffer gefunden</span>
             </div>
         """, unsafe_allow_html=True)
 
@@ -1112,4 +1183,10 @@ def show_revibed_fragment(revibed_results):
             st.session_state.discogs_revibed_mode = False
             st.session_state.show_digital = True
             st.session_state.mode_switch_button_shown = False
+            
+            # Clear the persistent timer when leaving secondary mode
+            if timer_key in st.session_state:
+                del st.session_state[timer_key]
+                print(f"🕐 REVIBED: Timer cleared when returning to digital results")
+            
             # Fragment will handle the rest automatically

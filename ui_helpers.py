@@ -1029,10 +1029,18 @@ def show_discogs_block(releases, track_for_search):
                     st.session_state.show_offers = True
                     st.session_state.offers_for_release = selected_idx
                     # st.rerun() KOMPLETT ENTFERNT - teste was passiert
+                
+                # Add Revibed search button below
+                revibed_button_key = f"search_revibed_btn_{selected_idx}"
+                if st.button("Search on revibed to artist or album", key=revibed_button_key):
+                    st.session_state.trigger_revibed_search = True
+                    st.rerun()  # Nötig für Handler
         st.markdown("---")
     else:
         st.image(NO_HIT_COVER, width=92)
         st.info("Keine Discogs-Releases gefunden.")
+    
+    # Revibed search handled by main.py handler
 
 # Legacy show_revibed_block() removed - now using unified show_revibed_fragment() everywhere
 
@@ -1053,6 +1061,8 @@ def show_offers_fragment(releases, selected_idx):
         search_discogs_offers_simplified(releases[selected_idx])
     elif selected_idx < len(releases):
         st.info("Click 'Search for Offers' to see marketplace listings")
+
+# Revibed search fragment entfernt - zurück zum Handler-System
 
 @st.fragment(run_every=2)
 def show_revibed_fragment(revibed_results):
@@ -1101,15 +1111,4 @@ def show_revibed_fragment(revibed_results):
             </div>
         """, unsafe_allow_html=True)
 
-    # --- Zurück-Button: Only show if there were digital hits (Scenario 1) ---
-    # Scenario 1: Digital hits exist -> show back button
-    # Scenario 2 & 3: No digital hits -> no back button
-    if st.session_state.get("has_digital_hits", False):
-        if st.button("Zurück zu digitalen Shops", key="digital_back_revibed"):
-            print("🔄 DEBUG: Back button clicked - returning to digital results")
-            
-            # Fragment-safe state changes (no aggressive clearing)
-            st.session_state.discogs_revibed_mode = False
-            st.session_state.show_digital = True
-            st.session_state.mode_switch_button_shown = False
-            # Fragment will handle the rest automatically
+    # Zurück-Button ist jetzt außerhalb des Fragments in main.py implementiert

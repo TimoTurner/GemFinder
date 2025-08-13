@@ -884,3 +884,65 @@
 2025-08-11 10:04:04,443 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3707446654
 2025-08-11 10:04:04,476 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3393330057
 2025-08-11 10:04:04,476 - discogs_scraper - INFO - Successfully scraped 8 offers for release 1194860
+2025-08-13 22:55:17,133 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-13 22:55:22,387 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-13 23:08:13,522 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-13 23:08:19,201 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-13 23:12:03,793 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-13 23:12:10,176 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-13 23:25:16,756 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-13 23:25:22,994 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-13 23:25:41,822 - discogs_scraper - INFO - Scraping offers for release 90463
+2025-08-13 23:25:47,855 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3430315803
+2025-08-13 23:25:47,888 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/610413542
+2025-08-13 23:25:47,918 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3674214940
+2025-08-13 23:25:47,949 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3420933951
+2025-08-13 23:25:47,980 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3742461082
+2025-08-13 23:25:48,011 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2070974408
+2025-08-13 23:25:48,043 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3084293668
+2025-08-13 23:25:48,074 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2809066828
+2025-08-13 23:25:48,074 - discogs_scraper - INFO - Successfully scraped 8 offers for release 90463
+2025-08-13 23:38:31,653 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-13 23:38:36,046 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-13 23:38:46,652 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-13 23:38:51,542 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-13 23:38:51,577 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-13 23:38:51,611 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-13 23:38:51,644 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-13 23:38:51,645 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-13 23:38:56,620 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-13 23:39:03,138 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-13 23:39:03,172 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-13 23:39:03,206 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-13 23:39:03,239 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-13 23:39:03,239 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-13 23:39:06,691 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-13 23:39:12,704 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-13 23:39:12,739 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-13 23:39:12,773 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-13 23:39:12,806 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-13 23:39:12,806 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-13 23:39:16,143 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-13 23:39:21,417 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-13 23:39:21,453 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-13 23:39:21,487 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-13 23:39:21,521 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-13 23:39:21,521 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-13 23:39:24,519 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-13 23:39:29,382 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-13 23:39:29,416 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-13 23:39:29,449 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-13 23:39:29,483 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-13 23:39:29,483 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-13 23:39:32,818 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-13 23:39:37,446 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-13 23:39:37,482 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-13 23:39:37,517 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-13 23:39:37,550 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-13 23:39:37,550 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-13 23:39:38,860 - discogs_scraper - INFO - Scraping offers for release 2170706
+2025-08-13 23:39:44,123 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1155556317
+2025-08-13 23:39:44,158 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3742572724
+2025-08-13 23:39:44,158 - discogs_scraper - INFO - Successfully scraped 2 offers for release 2170706
+2025-08-13 23:50:11,126 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-13 23:50:15,799 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979

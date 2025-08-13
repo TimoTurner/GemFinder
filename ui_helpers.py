@@ -897,7 +897,11 @@ def show_discogs_block(releases, track_for_search):
         release_col, offers_col = st.columns([1, 1])
         
         with release_col:
-            # Radio button selection with proper label
+            # Radio button selection with proper label and unique key
+            # Create unique key based on search criteria to avoid duplicates
+            search_context = f"{st.session_state.get('artist_input', '')}-{st.session_state.get('album_input', '')}-{st.session_state.get('track_for_search', '')}"
+            unique_key = f"release_select_{hash(search_context) % 10000}"
+            
             selected_idx = st.radio(
                 "Select a release:",
                 options=list(range(len(releases))),
@@ -907,7 +911,7 @@ def show_discogs_block(releases, track_for_search):
                     f" – {releases[i].get('label', ['-'])[0] if releases[i].get('label') else '-'}"
                     f" ({releases[i].get('year', '-')})"
                 ),
-                key="release_select",
+                key=unique_key,
                 label_visibility="collapsed"
             )
             
@@ -1099,10 +1103,26 @@ def show_revibed_fragment(revibed_results):
     
     # Check if there are any Revibed hits for display logic
     def is_real_revibed_hit(entry):
-        return is_valid_result(entry, check_empty_title=True)
+        title = (entry.get("title") or "").strip().lower()
+        # Check for error messages and invalid titles
+        error_patterns = [
+            "kein treffer", 
+            "fehler", 
+            "nicht verfügbar", 
+            "❌", 
+            "revibed suche nicht verfügbar"
+        ]
+        return title and not any(pattern in title for pattern in error_patterns)
+    
+    # Check if we have error results
+    def is_error_result(entry):
+        title = (entry.get("title") or "").strip().lower()
+        return "❌" in title or "nicht verfügbar" in title or "fehler" in title
     
     real_revibed_hits = [r for r in revibed_results if is_real_revibed_hit(r)]
+    error_results = [r for r in revibed_results if is_error_result(r)]
     has_revibed_hits = len(real_revibed_hits) > 0
+    has_errors = len(error_results) > 0
     
     st.markdown("#### Revibed: Treffer zu Artist und Release")
     
@@ -1161,6 +1181,17 @@ def show_revibed_fragment(revibed_results):
                 label=entry.get('label', ''),
                 price=entry.get('price', '')
             ), unsafe_allow_html=True)
+    elif has_errors:
+        # Show error message instead of trying to display error results
+        st.markdown("""
+            <div style="margin-bottom:1.7em; border:1px solid #ffebee; border-radius:14px; padding:0.7em 1.1em; box-shadow:0 2px 16px #ffcdd240;">
+                <div style="font-size:1.1em; font-weight:bold; color:#d32f2f; margin-bottom:0.5em;">
+                    Revibed
+                </div>
+                <span style="color:#666;">Suche momentan nicht verfügbar</span><br>
+                <span style="color:#999; font-size:0.9em;">Bitte versuchen Sie es später erneut</span>
+            </div>
+        """, unsafe_allow_html=True)
     elif revibed_results:
         # We have results but they're all "Kein Treffer" - show no results message
         st.markdown("""

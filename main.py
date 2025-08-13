@@ -580,52 +580,100 @@ if search_clicked or track_search_clicked:
                 with live_container:
                     show_live_results()
             elif can_search_secondary:
-                # Stage 2: No digital hits -> automatically search secondary platforms
+                # Stage 2: No digital hits -> automatically search secondary platforms with parallel execution
                 live_container.empty()
                 st.session_state.discogs_revibed_mode = True
                 st.session_state.show_digital = False
                 
-                # Search secondary platforms
-                for p in secondary_providers:
-                    if p.can_search(criteria):
-                        result = p.search(criteria)
-                        if p.name == "Discogs":
-                            st.session_state.results_discogs = result.get("releases", [])  # Extract releases list from dict
-                        elif p.name == "Revibed":
-                            print(f"🔍 DEBUG: Revibed search result: {result}")
-                            st.session_state.results_revibed = [result]
+                # Start parallel search for secondary platforms
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    # Submit both searches simultaneously
+                    discogs_future = None
+                    revibed_future = None
+                    
+                    for p in secondary_providers:
+                        if p.can_search(criteria):
+                            if p.name == "Discogs":
+                                discogs_future = executor.submit(search_platform_thread_safe, p, criteria)
+                            elif p.name == "Revibed":
+                                revibed_future = executor.submit(search_platform_thread_safe, p, criteria)
+                    
+                    # Process results as they complete
+                    futures = [f for f in [discogs_future, revibed_future] if f is not None]
+                    
+                    for future in as_completed(futures):
+                        thread_result = future.result()
+                        
+                        if thread_result["status"] == "success":
+                            if thread_result["provider"] == "Discogs":
+                                result = thread_result["result"]
+                                st.session_state.results_discogs = result.get("releases", [])
+                                print(f"🔍 DEBUG: Discogs results received - showing immediately")
+                                
+                                # Show Discogs results immediately when received
+                                with digital_container:
+                                    if st.session_state.results_discogs:
+                                        print(f"🌟 DEBUG MAIN: Calling show_discogs_block immediately after Discogs API response")
+                                        show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
+                                        
+                            elif thread_result["provider"] == "Revibed":
+                                result = thread_result["result"]
+                                print(f"🔍 DEBUG: Revibed search result: {result}")
+                                st.session_state.results_revibed = [result]
+                                
+                                # Show Revibed results when received (will be handled by fragment)
+                                with digital_container:
+                                    if st.session_state.results_revibed:
+                                        show_revibed_fragment(st.session_state.results_revibed)
                 
                 st.session_state.secondary_search_done = True
-                # Show results separately for better user experience
-                with digital_container:
-                    if st.session_state.results_discogs:
-                        print(f"🌟 DEBUG MAIN: Calling show_discogs_block from line 597 (first search area)")
-                        show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
-                    if st.session_state.results_revibed:
-                        show_revibed_fragment(st.session_state.results_revibed)
 
         # If only secondary platforms can search
         elif can_search_secondary:
             st.session_state.discogs_revibed_mode = True
             st.session_state.show_digital = False
             
-            # Search secondary platforms
-            for p in secondary_providers:
-                if p.can_search(criteria):
-                    result = p.search(criteria)
-                    if p.name == "Discogs":
-                        st.session_state.results_discogs = result.get("releases", [])  # Extract releases list from dict
-                    elif p.name == "Revibed":
-                        st.session_state.results_revibed = [result]
+            # Start parallel search for secondary platforms
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                # Submit both searches simultaneously
+                discogs_future = None
+                revibed_future = None
+                
+                for p in secondary_providers:
+                    if p.can_search(criteria):
+                        if p.name == "Discogs":
+                            discogs_future = executor.submit(search_platform_thread_safe, p, criteria)
+                        elif p.name == "Revibed":
+                            revibed_future = executor.submit(search_platform_thread_safe, p, criteria)
+                
+                # Process results as they complete
+                futures = [f for f in [discogs_future, revibed_future] if f is not None]
+                
+                for future in as_completed(futures):
+                    thread_result = future.result()
+                    
+                    if thread_result["status"] == "success":
+                        if thread_result["provider"] == "Discogs":
+                            result = thread_result["result"]
+                            st.session_state.results_discogs = result.get("releases", [])
+                            print(f"🔍 DEBUG: Discogs results received - showing immediately")
+                            
+                            # Show Discogs results immediately when received
+                            with digital_container:
+                                if st.session_state.results_discogs:
+                                    print(f"🌟 DEBUG MAIN: Calling show_discogs_block immediately after Discogs API response")
+                                    show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
+                                    
+                        elif thread_result["provider"] == "Revibed":
+                            result = thread_result["result"]
+                            st.session_state.results_revibed = [result]
+                            
+                            # Show Revibed results when received (will be handled by fragment)
+                            with digital_container:
+                                if st.session_state.results_revibed:
+                                    show_revibed_fragment(st.session_state.results_revibed)
             
             st.session_state.secondary_search_done = True
-            # Show results separately for better user experience
-            with digital_container:
-                if st.session_state.results_discogs:
-                    print(f"🌟 DEBUG MAIN: Calling show_discogs_block from line 619 (second search area)")
-                    show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
-                if st.session_state.results_revibed:
-                    show_revibed_fragment(st.session_state.results_revibed)
 
 # Reset when search criteria changed (cache invalid but search was started)
 elif st.session_state.suche_gestartet and not app_state.is_cache_valid():
@@ -680,14 +728,45 @@ if st.session_state.get("trigger_secondary_search", False) and can_search_second
     # Start secondary search in background without clearing existing results
     # This allows Revibed fragment to continue running if already started
     if not st.session_state.get("secondary_search_done", False):
-        # Search secondary platforms
-        for p in secondary_providers:
-            if p.can_search(criteria):
-                result = p.search(criteria)
-                if p.name == "Discogs":
-                    st.session_state.results_discogs = result.get("releases", [])
-                elif p.name == "Revibed":
-                    st.session_state.results_revibed = [result]
+        # Start parallel search for secondary platforms
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            # Submit both searches simultaneously
+            discogs_future = None
+            revibed_future = None
+            
+            for p in secondary_providers:
+                if p.can_search(criteria):
+                    if p.name == "Discogs":
+                        discogs_future = executor.submit(search_platform_thread_safe, p, criteria)
+                    elif p.name == "Revibed":
+                        revibed_future = executor.submit(search_platform_thread_safe, p, criteria)
+            
+            # Process results as they complete
+            futures = [f for f in [discogs_future, revibed_future] if f is not None]
+            
+            for future in as_completed(futures):
+                thread_result = future.result()
+                
+                if thread_result["status"] == "success":
+                    if thread_result["provider"] == "Discogs":
+                        result = thread_result["result"]
+                        st.session_state.results_discogs = result.get("releases", [])
+                        print(f"🔍 DEBUG: Discogs results received via mode switch - showing immediately")
+                        
+                        # Show Discogs results immediately when received
+                        with digital_container:
+                            if st.session_state.results_discogs:
+                                print(f"🌟 DEBUG MAIN: Calling show_discogs_block immediately after Discogs API response (mode switch)")
+                                show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
+                                
+                    elif thread_result["provider"] == "Revibed":
+                        result = thread_result["result"]
+                        st.session_state.results_revibed = [result]
+                        
+                        # Show Revibed results when received (will be handled by fragment)
+                        with digital_container:
+                            if st.session_state.results_revibed:
+                                show_revibed_fragment(st.session_state.results_revibed)
         
         st.session_state.secondary_search_done = True
     
@@ -695,7 +774,7 @@ if st.session_state.get("trigger_secondary_search", False) and can_search_second
     live_container.empty()
     digital_container.empty()
     
-    # Show results in digital container
+    # Show results in digital container if not already shown
     with digital_container:
         if st.session_state.results_discogs:
             show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)

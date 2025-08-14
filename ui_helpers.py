@@ -885,7 +885,11 @@ def show_discogs_block(releases, track_for_search):
         release_col, offers_col = st.columns([1, 1])
         
         with release_col:
-            # Radio button selection without label
+            # Initialize state properly to avoid first-load issues
+            if "release_selected_idx" not in st.session_state:
+                st.session_state.release_selected_idx = 0
+                
+            # Radio button selection without label - back to working version
             selected_idx = st.radio(
                 "",  # Empty label
                 options=list(range(len(releases))),
@@ -898,13 +902,14 @@ def show_discogs_block(releases, track_for_search):
                 key="release_select"
             )
             
-            # Check if selection changed and trigger rerun
+            # Check if selection changed - ADD RERUN but keep offers persistent
             if selected_idx != st.session_state.get("release_selected_idx", 0):
+                print(f"🔘 RADIO: Selection changed from {st.session_state.get('release_selected_idx', 0)} to {selected_idx}")
                 st.session_state.release_selected_idx = selected_idx
-                # Reset offers display when changing selection
-                st.session_state.show_offers = False
-                st.session_state.offers_for_release = None
-                st.rerun()
+                # DON'T reset offers display - let them persist so buttons keep working
+                # st.session_state.show_offers = False  # KEEP DISABLED - this was breaking buttons
+                # st.session_state.offers_for_release = None  # KEEP DISABLED - this was breaking buttons
+                st.rerun()  # Add rerun for immediate radio button response
             else:
                 st.session_state.release_selected_idx = selected_idx
 
@@ -1023,17 +1028,25 @@ def show_discogs_block(releases, track_for_search):
                     
                     st.markdown(tracklist_text)
                 
-                # Move search button below tracklist
+                # Move search button below tracklist - back to simple working keys
                 search_button_key = f"search_offers_btn_{selected_idx}"
+                current_offers_state = st.session_state.get("show_offers", False)
+                current_offers_release = st.session_state.get("offers_for_release", None)
+                
+                print(f"🔍 PRE-BUTTON: selected_idx={selected_idx}, show_offers={current_offers_state}, offers_for_release={current_offers_release}")
+                
                 if st.button("Search for Offers", key=search_button_key):
                     st.session_state.show_offers = True
                     st.session_state.offers_for_release = selected_idx
+                    print(f"🔍 BUTTON CLICKED: Search button clicked for release {selected_idx}")
+                    print(f"🔍 POST-BUTTON: show_offers={st.session_state.show_offers}, offers_for_release={st.session_state.offers_for_release}")
                     # st.rerun() KOMPLETT ENTFERNT - teste was passiert
                 
-                # Add Revibed search button below
+                # Add Revibed search button below - simple key
                 revibed_button_key = f"search_revibed_btn_{selected_idx}"
                 if st.button("Search on revibed to artist or album", key=revibed_button_key):
                     st.session_state.trigger_revibed_search = True
+                    print(f"🔍 BUTTON: Revibed button clicked")
                     st.rerun()  # Nötig für Handler
         st.markdown("---")
     else:
@@ -1055,9 +1068,11 @@ def show_offers_fragment(releases, selected_idx):
     offers_state = st.session_state.get("show_offers", False)
     offers_release = st.session_state.get("offers_for_release", None)
     
-    if (selected_idx < len(releases) and 
-        offers_state and 
-        offers_release == selected_idx):
+    # Only log when state changes to reduce spam
+    should_show_offers = (selected_idx < len(releases) and offers_state and offers_release == selected_idx)
+    
+    if should_show_offers:
+        print(f"📦 FRAGMENT: *** SHOWING OFFERS *** for release {selected_idx}")
         search_discogs_offers_simplified(releases[selected_idx])
     elif selected_idx < len(releases):
         st.info("Click 'Search for Offers' to see marketplace listings")

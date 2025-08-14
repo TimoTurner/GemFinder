@@ -93,6 +93,8 @@ st.markdown("""
 # Clear render flags from previous script run
 if "discogs_rendered_this_run" in st.session_state:
     del st.session_state.discogs_rendered_this_run
+# DON'T clear discogs_just_rendered here - it should persist during the same run
+# It will be cleared at the end of the script or when explicitly needed
 
 # Store scroll position in session state
 if "scroll_position" not in st.session_state:
@@ -581,10 +583,33 @@ if search_clicked or track_search_clicked:
                 with live_container:
                     show_live_results()
             elif can_search_secondary:
-                # Stage 2: No digital hits -> automatically search secondary platforms
-                live_container.empty()
+                # Stage 2: No digital hits -> hide digital container and switch to secondary platforms
+                print(f"🔍 DEBUG: No digital hits found - hiding digital container and switching to secondary")
+                
+                # Use the same clearing logic as mode-switch button (bewährte Funktion!)
+                # Clear containers to remove live results and header
+                live_container.empty()  # This removes the "Digital Results" header and any content
+                # Don't clear secondary_container here since we'll use it immediately below
+                
+                if "live_results_containers" in st.session_state:
+                    for container in st.session_state.live_results_containers.values():
+                        container.empty()
+                
+                # Clear the header container as well
+                if "live_results_header_container" in st.session_state:
+                    st.session_state.live_results_header_container.empty()
+                
+                # Clear progress bar
+                if "live_progress_container" in st.session_state:
+                    st.session_state.live_progress_container.empty()
+                
+                # Set flags for secondary mode
                 st.session_state.discogs_revibed_mode = True
                 st.session_state.show_digital = False
+                
+                # Clear digital results completely to prevent re-display
+                st.session_state.results_digital = []
+                st.session_state.live_results = []
                 
                 # Search only Discogs automatically
                 for p in secondary_providers:
@@ -597,35 +622,91 @@ if search_clicked or track_search_clicked:
                 if "results_revibed" not in st.session_state:
                     st.session_state.results_revibed = []
                 
+                # Use the same progress container as normal secondary search
+                if "live_progress_container" not in st.session_state:
+                    st.session_state.live_progress_container = st.empty()
+                
+                # Show progress bar exactly like normal secondary search
+                searchable_secondary = [p for p in secondary_providers if p.can_search(criteria)]
+                searchable_secondary.sort(key=lambda p: 0 if p.name == "Discogs" else 1)
+                
+                with st.session_state.live_progress_container.container():
+                    progress_text = ", ".join([f"{p.name} ⏳" for p in searchable_secondary])
+                    st.info(f"🔍 Searching: {progress_text}")
+                    st.progress(0)
+                
+                # Search with progress updates (same as normal secondary search)
+                for i, p in enumerate(searchable_secondary):
+                    print(f"🔍 DEBUG: Searching {p.name}...")
+                    
+                    # Update progress during search
+                    with st.session_state.live_progress_container.container():
+                        st.info(f"🔍 Searching: {p.name} ⏳")
+                        st.progress(0.5)
+                    
+                    # Perform search
+                    result = p.search(criteria)
+                    if p.name == "Discogs":
+                        st.session_state.results_discogs = result.get("releases", [])
+                        print("🔍 DEBUG: Discogs loaded - showing Discogs results...")
+                        # Show Discogs results immediately
+                        with secondary_container:
+                            show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
+                    
+                    # Update progress after completion
+                    with st.session_state.live_progress_container.container():
+                        st.info(f"🔍 Searching: {p.name} ✅")
+                        st.progress(1.0)
+                
+                # Clear progress bar after completion
+                st.session_state.live_progress_container.empty()
+                
                 st.session_state.secondary_search_done = True
-                # Show only Discogs results - Revibed will be added via button
-                with secondary_container:
-                    if st.session_state.results_discogs:
-                        print(f"🌟 DEBUG MAIN: Calling show_discogs_block from line 597 (first search area)")
-                        show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
+                st.session_state.secondary_search_active = False  # Reset flag - same as normal secondary search
+                st.session_state.discogs_just_rendered = True  # Prevent cached results from re-rendering in same run
+                # Keep suche_gestartet = True for normal button functionality - CRITICAL for cached results logic!
 
         # If only secondary platforms can search
         elif can_search_secondary:
             st.session_state.discogs_revibed_mode = True
             st.session_state.show_digital = False
             
-            # Search only Discogs automatically
-            for p in secondary_providers:
-                if p.can_search(criteria):
-                    result = p.search(criteria)
-                    if p.name == "Discogs":
-                        st.session_state.results_discogs = result.get("releases", [])  # Extract releases list from dict
+            # Use the same secondary search logic as auto-switch case
+            if "live_progress_container" not in st.session_state:
+                st.session_state.live_progress_container = st.empty()
+            
+            searchable_secondary = [p for p in secondary_providers if p.can_search(criteria)]
+            searchable_secondary.sort(key=lambda p: 0 if p.name == "Discogs" else 1)
+            
+            with st.session_state.live_progress_container.container():
+                progress_text = ", ".join([f"{p.name} ⏳" for p in searchable_secondary])
+                st.info(f"🔍 Searching: {progress_text}")
+                st.progress(0)
+            
+            for i, p in enumerate(searchable_secondary):
+                with st.session_state.live_progress_container.container():
+                    st.info(f"🔍 Searching: {p.name} ⏳")
+                    st.progress(0.5)
+                
+                result = p.search(criteria)
+                if p.name == "Discogs":
+                    st.session_state.results_discogs = result.get("releases", [])
+                    with secondary_container:
+                        show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
+                        st.session_state.discogs_just_rendered = True  # Prevent cached results from re-rendering
+                
+                with st.session_state.live_progress_container.container():
+                    st.info(f"🔍 Searching: {p.name} ✅")
+                    st.progress(1.0)
+            
+            st.session_state.live_progress_container.empty()
             
             # Initialize empty revibed results - will be filled on button click
             if "results_revibed" not in st.session_state:
                 st.session_state.results_revibed = []
             
             st.session_state.secondary_search_done = True
-            # Show only Discogs results - Revibed will be added via button
-            with secondary_container:
-                if st.session_state.results_discogs:
-                    print(f"🌟 DEBUG MAIN: Calling show_discogs_block from line 619 (second search area)")
-                    show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
+            st.session_state.secondary_search_active = False
 
 # Reset when search criteria changed (cache invalid but search was started)
 elif st.session_state.suche_gestartet and not app_state.is_cache_valid():
@@ -700,7 +781,7 @@ if st.session_state.get("trigger_secondary_search", False) and can_search_second
     
     # Clear containers to remove verblasste results and header (keep progress container for secondary search)
     live_container.empty()  # This removes the "Digital Results" header and any content in live_container
-    secondary_container.empty()  # Clear secondary container as well
+    # Don't clear secondary_container here since we'll use it immediately below for Discogs results
     
     if "live_results_containers" in st.session_state:
         for container in st.session_state.live_results_containers.values():
@@ -748,6 +829,7 @@ if st.session_state.get("trigger_secondary_search", False) and can_search_second
             # Show Discogs results immediately
             with secondary_container:
                 show_discogs_block(st.session_state.results_discogs, st.session_state.track_for_search)
+                st.session_state.discogs_just_rendered = True  # Prevent cached results from re-rendering
         
         # Update progress after completion
         with st.session_state.live_progress_container.container():
@@ -771,8 +853,15 @@ elif st.session_state.suche_gestartet and app_state.is_cache_valid():
             show_live_results()
     else:
         print(f"🔍 DEBUG: NOT showing cached digital - show_digital={st.session_state.get('show_digital')}, discogs_mode={st.session_state.get('discogs_revibed_mode')}")
+        # Ensure live container is empty when not showing digital results
+        live_container.empty()
     
-    if st.session_state.discogs_revibed_mode and st.session_state.secondary_search_done:
+    discogs_just_rendered = st.session_state.get("discogs_just_rendered", False)
+    print(f"🌟 DEBUG: Cached results check - discogs_revibed_mode={st.session_state.get('discogs_revibed_mode')}, secondary_search_done={st.session_state.get('secondary_search_done')}, discogs_just_rendered={discogs_just_rendered}")
+    
+    if (st.session_state.discogs_revibed_mode and 
+        st.session_state.secondary_search_done and
+        not discogs_just_rendered):
         print(f"🌟 DEBUG MAIN: Entering cached secondary results block (line 764)")
         # Show cached secondary results - now completely separated
         with secondary_container:
@@ -782,9 +871,13 @@ elif st.session_state.suche_gestartet and app_state.is_cache_valid():
                 st.session_state.results_discogs, 
                 st.session_state.track_for_search
             )
+            # Set flag to prevent any duplicate rendering in the same run
+            st.session_state.discogs_just_rendered = True
             # Revibed fragment only if search was triggered
             if st.session_state.results_revibed:
                 show_revibed_fragment(st.session_state.results_revibed)
+    else:
+        print(f"🌟 DEBUG: Skipping cached results - conditions not met or already rendered")
 
 # Mode switch buttons - placed at the very end, outside all containers
 if (st.session_state.get("digital_search_done", False) and 
@@ -818,6 +911,11 @@ if (st.session_state.get("discogs_revibed_mode", False) and
         # Set flag to trigger clean switch (bewährtes Pattern)
         st.session_state.switch_to_digital = True
         st.rerun()
+
+# Clear the discogs_just_rendered flag at the end of the script run
+if "discogs_just_rendered" in st.session_state:
+    print(f"🚩 DEBUG: Clearing discogs_just_rendered flag at end of script run")
+    del st.session_state.discogs_just_rendered
 
 # # ganz unten, oberhalb des Endes von main.py
 # if st.session_state.suche_gestartet and not search_clicked:

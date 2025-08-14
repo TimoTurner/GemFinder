@@ -946,3 +946,308 @@
 2025-08-13 23:39:44,158 - discogs_scraper - INFO - Successfully scraped 2 offers for release 2170706
 2025-08-13 23:50:11,126 - discogs_scraper - INFO - Scraping offers for release 322979
 2025-08-13 23:50:15,799 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-14 08:41:13,910 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 08:41:14,073 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:41:14,145 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:41:14,212 - WDM - INFO - There is no [mac64] chromedriver "138.0.7204.183" for browser google-chrome "138.0.7204" in cache
+2025-08-14 08:41:14,219 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:41:14,410 - WDM - INFO - WebDriver version 138.0.7204.183 selected
+2025-08-14 08:41:14,413 - WDM - INFO - Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.183/mac-arm64/chromedriver-mac-arm64.zip
+2025-08-14 08:41:14,413 - WDM - INFO - About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.183/mac-arm64/chromedriver-mac-arm64.zip
+2025-08-14 08:41:14,655 - WDM - INFO - Driver downloading response is 200
+2025-08-14 08:41:15,438 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:41:15,582 - WDM - INFO - Driver has been saved in cache [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183]
+2025-08-14 08:41:16,383 - discogs_scraper - INFO - Scraping offers for release 8644981
+2025-08-14 08:41:21,455 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2970857927
+2025-08-14 08:41:21,490 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2493706070
+2025-08-14 08:41:21,522 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3773763990
+2025-08-14 08:41:21,554 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1683716608
+2025-08-14 08:41:21,586 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3739815355
+2025-08-14 08:41:21,617 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1123782260
+2025-08-14 08:41:21,648 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2791548634
+2025-08-14 08:41:21,679 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/985601407
+2025-08-14 08:41:21,679 - discogs_scraper - INFO - Successfully scraped 8 offers for release 8644981
+2025-08-14 08:41:26,482 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 08:41:26,678 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:41:26,752 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:41:26,815 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 08:41:27,378 - discogs_scraper - INFO - Scraping offers for release 8644981
+2025-08-14 08:41:32,813 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2970857927
+2025-08-14 08:41:32,847 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2493706070
+2025-08-14 08:41:32,881 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3773763990
+2025-08-14 08:41:32,914 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1683716608
+2025-08-14 08:41:32,946 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3739815355
+2025-08-14 08:41:32,980 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1123782260
+2025-08-14 08:41:33,013 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2791548634
+2025-08-14 08:41:33,046 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/985601407
+2025-08-14 08:41:33,046 - discogs_scraper - INFO - Successfully scraped 8 offers for release 8644981
+2025-08-14 08:42:39,142 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 08:42:39,311 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:42:39,381 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:42:39,461 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 08:42:39,977 - discogs_scraper - INFO - Scraping offers for release 1543120
+2025-08-14 08:42:45,854 - discogs_scraper - INFO - Successfully scraped 1 offers for release 1543120
+2025-08-14 08:49:36,938 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 08:49:37,130 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:49:37,211 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:49:37,280 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 08:49:37,821 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-14 08:49:43,187 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-14 08:52:46,705 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 08:52:46,866 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:52:46,946 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 08:52:47,024 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 08:52:47,534 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-14 08:52:52,898 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-14 09:12:09,569 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:12:09,727 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:12:09,793 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:12:09,861 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:12:10,466 - discogs_scraper - INFO - Scraping offers for release 8644981
+2025-08-14 09:12:16,190 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2970857927
+2025-08-14 09:12:16,225 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2493706070
+2025-08-14 09:12:16,258 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3773763990
+2025-08-14 09:12:16,291 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1683716608
+2025-08-14 09:12:16,325 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3739815355
+2025-08-14 09:12:16,359 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1123782260
+2025-08-14 09:12:16,392 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2791548634
+2025-08-14 09:12:16,425 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/985601407
+2025-08-14 09:12:16,425 - discogs_scraper - INFO - Successfully scraped 8 offers for release 8644981
+2025-08-14 09:17:25,166 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:17:25,327 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:17:25,409 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:17:25,514 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:17:26,018 - discogs_scraper - INFO - Scraping offers for release 1194860
+2025-08-14 09:17:30,904 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/169013251
+2025-08-14 09:17:30,940 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2604084585
+2025-08-14 09:17:30,973 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2648326896
+2025-08-14 09:17:31,007 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/328378710
+2025-08-14 09:17:31,041 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/8790411
+2025-08-14 09:17:31,076 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3707446654
+2025-08-14 09:17:31,109 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3393330057
+2025-08-14 09:17:31,142 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1250973918
+2025-08-14 09:17:31,143 - discogs_scraper - INFO - Successfully scraped 8 offers for release 1194860
+2025-08-14 09:21:43,334 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:21:43,520 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:21:43,595 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:21:43,662 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:21:44,244 - discogs_scraper - INFO - Scraping offers for release 1543120
+2025-08-14 09:21:49,220 - discogs_scraper - INFO - Successfully scraped 1 offers for release 1543120
+2025-08-14 09:26:31,884 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:26:32,046 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:26:32,116 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:26:32,188 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:26:32,829 - discogs_scraper - INFO - Scraping offers for release 8644981
+2025-08-14 09:26:38,564 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2970857927
+2025-08-14 09:26:38,596 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2493706070
+2025-08-14 09:26:38,627 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3773763990
+2025-08-14 09:26:38,659 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1683716608
+2025-08-14 09:26:38,690 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3739815355
+2025-08-14 09:26:38,721 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1123782260
+2025-08-14 09:26:38,753 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2791548634
+2025-08-14 09:26:38,784 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/985601407
+2025-08-14 09:26:38,784 - discogs_scraper - INFO - Successfully scraped 8 offers for release 8644981
+2025-08-14 09:41:02,374 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:41:02,534 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:02,618 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:02,692 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:41:03,245 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:41:08,687 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:41:08,722 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:41:08,756 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:41:08,790 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:41:08,790 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:41:12,967 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:41:13,133 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:13,205 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:13,268 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:41:13,809 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:41:18,680 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:41:18,715 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:41:18,749 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:41:18,783 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:41:18,783 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:41:22,950 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:41:23,127 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:23,195 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:23,266 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:41:23,788 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:41:29,188 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:41:29,223 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:41:29,256 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:41:29,289 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:41:29,289 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:41:33,619 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:41:33,792 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:33,862 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:33,937 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:41:34,473 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:41:39,963 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:41:39,997 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:41:40,031 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:41:40,064 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:41:40,064 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:41:44,533 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:41:44,709 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:44,783 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:44,852 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:41:45,391 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:41:51,260 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:41:51,297 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:41:51,333 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:41:51,367 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:41:51,367 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:41:55,793 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:41:55,967 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:56,036 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:41:56,101 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:41:56,638 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:42:01,558 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:42:01,592 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:42:01,624 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:42:01,656 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:42:01,656 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:42:03,996 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:42:04,166 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:04,236 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:04,308 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:42:04,821 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:42:09,796 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:42:09,828 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:42:09,860 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:42:09,891 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:42:09,891 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:42:14,119 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:42:14,243 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:14,313 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:14,379 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:42:14,918 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:42:20,388 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:42:20,424 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:42:20,466 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:42:20,509 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:42:20,509 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:42:22,987 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:42:23,163 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:23,239 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:23,306 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:42:23,846 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:42:29,735 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:42:29,768 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:42:29,800 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:42:29,833 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:42:29,833 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:42:33,899 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:42:34,071 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:34,137 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:34,205 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:42:34,747 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:42:39,618 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:42:39,651 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:42:39,683 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:42:39,715 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:42:39,715 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:42:42,549 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:42:42,719 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:42,799 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:42,872 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:42:43,406 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:42:49,388 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:42:49,421 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:42:49,453 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:42:49,484 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:42:49,484 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:42:52,598 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:42:52,799 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:52,876 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:42:52,948 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:42:53,482 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:43:00,425 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:43:00,467 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:43:00,505 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:43:00,541 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:43:00,541 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:43:04,539 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:43:04,713 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:43:04,790 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:43:04,860 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:43:05,373 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:43:11,067 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:43:11,099 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:43:11,130 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:43:11,162 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:43:11,162 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:43:13,920 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:43:14,090 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:43:14,165 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:43:14,229 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:43:14,760 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:43:20,519 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:43:20,552 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:43:20,583 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:43:20,614 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:43:20,614 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:43:24,129 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:43:24,255 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:43:24,329 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:43:24,398 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:43:24,940 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:43:30,220 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:43:30,253 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:43:30,284 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:43:30,314 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:43:30,314 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:43:32,692 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:43:32,889 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:43:32,961 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:43:33,029 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:43:33,573 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:43:39,690 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:43:39,729 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:43:39,766 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:43:39,803 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:43:39,803 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:43:43,533 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:43:43,720 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:43:43,816 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:43:43,921 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:43:44,499 - discogs_scraper - INFO - Scraping offers for release 33786984
+2025-08-14 09:43:50,064 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3636717438
+2025-08-14 09:43:50,098 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3777276485
+2025-08-14 09:43:50,129 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3661156788
+2025-08-14 09:43:50,160 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3781402547
+2025-08-14 09:43:50,160 - discogs_scraper - INFO - Successfully scraped 4 offers for release 33786984
+2025-08-14 09:51:00,565 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:51:00,757 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:51:00,842 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:51:00,915 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:51:01,541 - discogs_scraper - INFO - Scraping offers for release 698052
+2025-08-14 09:51:07,057 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3692827663
+2025-08-14 09:51:07,058 - discogs_scraper - INFO - Successfully scraped 1 offers for release 698052
+2025-08-14 09:52:33,934 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:52:34,107 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:52:34,184 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:52:34,252 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:52:34,855 - discogs_scraper - INFO - Scraping offers for release 322979
+2025-08-14 09:52:39,993 - discogs_scraper - INFO - Successfully scraped 1 offers for release 322979
+2025-08-14 09:54:14,503 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:54:14,699 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:54:14,775 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:54:14,847 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:54:15,485 - discogs_scraper - INFO - Scraping offers for release 489201
+2025-08-14 09:54:21,518 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1740382840
+2025-08-14 09:54:21,553 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3649480191
+2025-08-14 09:54:21,587 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3457898808
+2025-08-14 09:54:21,621 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/2714608573
+2025-08-14 09:54:21,655 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/900028561
+2025-08-14 09:54:21,688 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1560102229
+2025-08-14 09:54:21,720 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/51425878
+2025-08-14 09:54:21,753 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/1865128858
+2025-08-14 09:54:21,753 - discogs_scraper - INFO - Successfully scraped 8 offers for release 489201
+2025-08-14 09:56:03,496 - WDM - INFO - ====== WebDriver manager ======
+2025-08-14 09:56:03,616 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:56:03,695 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2025-08-14 09:56:03,762 - WDM - INFO - Driver [/Users/timo/.wdm/drivers/chromedriver/mac64/138.0.7204.183/chromedriver-mac-arm64/chromedriver] found in cache
+2025-08-14 09:56:04,441 - discogs_scraper - INFO - Scraping offers for release 10979519
+2025-08-14 09:56:10,574 - discogs_scraper - INFO - Found offer URL via marketplace link: https://www.discogs.com/sell/item/3780410858
+2025-08-14 09:56:10,574 - discogs_scraper - INFO - Successfully scraped 1 offers for release 10979519

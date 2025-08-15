@@ -124,8 +124,7 @@ def get_itunes_release_info(artist, track):
                 if filtered_candidates:
                     # Take the first filtered result (iTunes usually orders by relevance)
                     r = filtered_candidates[0]
-                    print(f"🎯 iTunes selected: {r.get('trackName', 'No Title')}")
-                    return {
+                    result = {
                         "platform": "iTunes",
                         "title": r.get("trackName", ""),
                         "artist": r.get("artistName", ""),
@@ -136,6 +135,8 @@ def get_itunes_release_info(artist, track):
                         "url": r.get("trackViewUrl", ""),
                         "preview": r.get("previewUrl", "")
                     }
+                    print(f"⏱️ iTunes: {result['title']} ({elapsed:.2f}s)")
+                    return result
                 else:
                     print("📭 iTunes: All results filtered out - no relevant matches")
             else:
@@ -143,6 +144,7 @@ def get_itunes_release_info(artist, track):
         else:
             print(f"❌ iTunes API error: Status {response.status_code}")
         
+        print(f"⏱️ iTunes: Kein Treffer ({elapsed:.2f}s)")
         return {
             "platform": "iTunes", 
             "title": "Kein Treffer", 
@@ -157,7 +159,7 @@ def get_itunes_release_info(artist, track):
         
     except Exception as e:
         elapsed = time.time() - t0 if 't0' in locals() else 0
-        print(f"❌ iTunes API error after {elapsed:.3f}s: {e}")
+        print(f"⏱️ iTunes: ❌ iTunes Suche nicht verfügbar ({elapsed:.2f}s)")
         return {
             "platform": "iTunes", 
             "title": "❌ iTunes Suche nicht verfügbar", 
@@ -274,13 +276,18 @@ def search_discogs_releases(artist=None, track=None, album=None, catno=None):
                 # Better cover image handling
                 cover_image = result.get("cover_image") or result.get("thumb") or ""
                 
+                # SPEED FIX: Skip tracklist details for initial search (too slow with 10 extra API calls)
+                # Tracklist will be loaded on-demand when user selects a specific release
+                release_id = str(result.get("id", ""))
+                full_tracklist = []  # Load tracklist only when needed, not for all 10 results
+                
                 formatted_results.append({
-                    "id": str(result.get("id", "")),
+                    "id": release_id,
                     "cover": cover_image,
                     "thumb": result.get("thumb", cover_image),
                     "title": release_title,
                     "artist": artist_from_title,
-                    "tracklist": [],  # Would need separate API call for full tracklist
+                    "tracklist": full_tracklist,  # Now includes actual tracklist
                     "label": result.get("label", []),
                     "year": result.get("year", ""),
                     "format": result.get("format", []),
@@ -344,7 +351,6 @@ def get_discogs_release_details(release_id):
             "User-Agent": "GemFinderApp/1.0"
         }
         
-        print(f"Getting Discogs release details for ID: {release_id}")
         response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:

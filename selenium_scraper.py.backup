@@ -122,6 +122,7 @@ def selenium_extract_offer_details_with_driver(driver, offer_url: str, user_coun
         Dict with availability and shipping info, or None if unavailable
     """
     try:
+        print(f"Selenium: Accessing {offer_url}")
         start_time = time.time()
         selenium_get_with_ipv4(driver, offer_url)
         
@@ -173,7 +174,7 @@ def selenium_extract_offer_details_with_driver(driver, offer_url: str, user_coun
 def extract_shipping_with_selenium(driver, user_country: str = "DE") -> Dict:
     """Extract shipping cost using Selenium element selection - focused on pricing areas only"""
     try:
-        # Looking for shipping information in pricing areas
+        print("Selenium: Looking for shipping information in pricing areas...")
         
         # Strategy 1: Look for the specific 'reduced' span that contains shipping info
         try:

@@ -250,7 +250,7 @@ def search_beatport(artist, track, album=""):
             search_terms.append(album)
         
         search_query = "%20".join(search_terms)
-# Performance timing only
+        print(f"🎧 Beatport search: '{' + '.join(search_terms)}'")
         start_time = time.time()
         
         url = f"https://www.beatport.com/search/tracks?q={search_query}"
@@ -260,90 +260,47 @@ def search_beatport(artist, track, album=""):
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
-        
-        # SMART SPEED OPTIMIZATIONS for <4s target
-        options.add_argument('--disable-images')                    
-        # Re-enable JavaScript - Beatport might need it for dynamic content
-        options.add_argument('--disable-plugins')
-        options.add_argument('--disable-extensions')
-        options.add_argument('--disable-background-timer-throttling')
-        options.add_argument('--disable-backgrounding-occluded-windows')
-        options.add_argument('--disable-renderer-backgrounding')
-        options.add_argument('--disable-features=TranslateUI,VizDisplayCompositor')
-        options.add_argument('--disable-ipc-flooding-protection')
-        options.add_argument('--disable-default-apps')
-        options.add_argument('--disable-sync')
-        options.add_argument('--disable-web-security')
-        options.add_argument('--window-size=800,600')               # Even smaller
-        options.add_argument('--page-load-strategy=eager')          # Less aggressive than 'none'
-        
-        # Network optimizations - block everything possible
-        options.add_experimental_option("prefs", {
-            "profile.default_content_setting_values.notifications": 2,
-            "profile.managed_default_content_settings.images": 2,
-            "profile.default_content_setting_values.plugins": 2,
-            "profile.default_content_setting_values.popups": 2,
-            "profile.default_content_setting_values.geolocation": 2,
-            "profile.default_content_setting_values.media_stream": 2,
-        })
+        # Keep JavaScript/CSS enabled for Beatport compatibility
         
         driver = webdriver.Chrome(options=options)
         
-        # ULTIMATE SPEED PUSH for <4s target 
-        driver.implicitly_wait(0.6)                  # 0.8s → 0.6s 
-        driver.set_page_load_timeout(2.2)            # 2.5s → 2.2s
-        wait = WebDriverWait(driver, 1.2)            # 1.5s → 1.2s
+        # Force IPv4 to avoid IPv6 timeout delays
+        import socket
+        original_getaddrinfo = socket.getaddrinfo
+        def getaddrinfo_ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
+            return original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+        socket.getaddrinfo = getaddrinfo_ipv4_only
         
-        driver.get(url)
-        
-        # SKIP cookie banner - waste of time for scraping
-        # Cookie acceptance not needed for search results
-        
-        # DEBUG: Detailed result detection
         try:
-            print(f"🔍 Beatport: Waiting for tracks with 1.2s timeout...")
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div[data-testid="tracks-list-item"]')))
-            rows = driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="tracks-list-item"]')
-            print(f"✅ Beatport: Found {len(rows)} tracks with primary selector")
-        except Exception as e:
-            print(f"❌ Beatport: Primary selector timed out: {e}")
-            # Check if page actually loaded
-            page_source = driver.page_source
-            print(f"📄 Beatport: Page source length: {len(page_source)} chars")
-            print(f"🔍 Beatport: Page title: '{driver.title}'")
-            
-            # Fast fallback - only one alternative
-            try:
-                rows = driver.find_elements(By.CSS_SELECTOR, 'div[class*="track"]')
-                print(f"🔄 Beatport: Fallback found {len(rows)} elements")
-            except Exception as e2:
-                print(f"❌ Beatport: Fallback also failed: {e2}")
-                rows = []
+            driver.get(url)
+        finally:
+            # Restore original getaddrinfo
+            socket.getaddrinfo = original_getaddrinfo
         
-        if not rows:
-            print(f"⚠️ Beatport: No rows found, analyzing page...")
-            # SMART no-results detection - check specific indicators
+        wait = WebDriverWait(driver, 5)  # Fast timeout for speed
+        
+        # Cookies akzeptieren (falls vorhanden)
+        try:
+            wait.until(EC.element_to_be_clickable(
+                (By.XPATH, "//button[contains(text(),'Accept') or contains(text(),'I Accept')]")
+            )).click()
+        except:
+            pass
+        
+        # Check if there are any results first, instead of waiting for elements that might not exist
+        try:
+            wait.until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, 'div[data-testid="tracks-list-item"]')
+            ))
+            rows = driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="tracks-list-item"]')
+        except:
+            # No track rows found - check if this is "no results" or a real error
             page_source = driver.page_source.lower()
-            
-            # More specific checks for actual "no results" vs false positives
-            no_results_indicators = [
-                "no tracks found",
-                "0 results for", 
-                "sorry, no results",
-                "keine suchergebnisse"
-            ]
-            
-            found_indicators = [indicator for indicator in no_results_indicators if indicator in page_source]
-            print(f"🔍 Beatport: Found no-results indicators: {found_indicators}")
-            
-            is_no_results = any(indicator in page_source for indicator in no_results_indicators)
-            
-            # If page loaded but really no results (not just missing selector)
-            if is_no_results and len(page_source) > 1000:
-                print(f"📭 Beatport: Confirmed no results - legitimate 'no results' page")
+            if "no results" in page_source or "keine ergebnisse" in page_source or len(page_source) > 1000:
+                # Page loaded successfully but no results found
+                print(f"📭 Beatport no results: No tracks found for search")
                 driver.quit()
                 elapsed_time = time.time() - start_time
-                print(f"⏱️ Beatport: Kein Treffer ({elapsed_time:.2f}s)")
                 return [{
                     'platform': 'Beatport',
                     'title': 'Kein Treffer',
@@ -355,47 +312,27 @@ def search_beatport(artist, track, album=""):
                     'url': '',
                     'search_time': elapsed_time
                 }]
-            
-            # If not clearly "no results", it might be selector issue - return error
-            print(f"🔧 Beatport: Not clearly 'no results' - might be selector/timing issue")
-            driver.quit()
-            elapsed_time = time.time() - start_time
-            print(f"⏱️ Beatport: ❌ Selector issue - page loaded but tracks not found ({elapsed_time:.2f}s)")
-            return [{
-                'platform': 'Beatport',
-                'title': '❌ Beatport Selector Update nötig',
-                'artist': '',
-                'album': '',
-                'label': '',
-                'price': '',
-                'cover_url': '',
-                'url': '',
-                'search_time': elapsed_time
-            }]
+            else:
+                # Real error - page didn't load properly
+                raise Exception("Page did not load properly")
         
         if not rows:
             print("Beatport: No results found with any selector")
             return [{'platform': 'Beatport', 'title': 'No results found', 'artist': '', 'album': '', 'label': '', 'price': '', 'cover_url': '', 'url': '', 'search_time': 2.0}]
         
-        candidates = []  # Collect candidates for relevance scoring
+        results = []
+        candidates = []  # Collect top 3 candidates for relevance scoring
         
-        print(f"🎵 Beatport: Processing {len(rows[:1])} track(s)...")
-        
-        # SPEED OPTIMIZATION: Process 1 result for <4s target
-        # Beatport sorts well by relevance, first result usually best
-        for row in rows[:1]:
+        # Process top 3 results for relevance scoring
+        for row in rows[:3]:
             try:
-                print(f"🎯 Beatport: Extracting title...")
                 # Extract title from track name - new Beatport structure
                 title_elem = row.find_element(By.CSS_SELECTOR, 'span.Lists-shared-style__ItemName-sc-cd3f7e11-7')
                 title = title_elem.text.strip()
-                print(f"✅ Beatport: Found title: '{title}'")
                 
-                # Extract artists - FIXED selector
-                print(f"🎯 Beatport: Extracting artists...")
-                artist_elems = row.find_elements(By.CSS_SELECTOR, 'a[href*="/artist/"]')
+                # Extract artists - new structure
+                artist_elems = row.find_elements(By.CSS_SELECTOR, 'div.ArtistNames-sc-72fc6023-0 a')
                 artists = ', '.join([elem.text.strip() for elem in artist_elems]) if artist_elems else 'Unknown Artist'
-                print(f"✅ Beatport: Found artists: '{artists}'")
                 
                 # Extract label - look for label link in the meta section
                 try:
@@ -425,33 +362,10 @@ def search_beatport(artist, track, album=""):
                 except:
                     price = ""  # No fallback price - leave empty if not found
                 
-                # FAST URL extraction - single optimized selector
-                track_url = ""
-                try:
-                    # Use most reliable selector first
-                    link_elem = row.find_element(By.CSS_SELECTOR, 'a[href*="/track/"]')
-                    track_url = link_elem.get_attribute('href')
-                except:
-                    # Fast fallback - search within row for any track link
-                    try:
-                        all_links = row.find_elements(By.TAG_NAME, 'a')
-                        for link in all_links[:2]:  # Check max 2 links for speed
-                            href = link.get_attribute('href')
-                            if href and '/track/' in href:
-                                track_url = href
-                                break
-                    except:
-                        track_url = f'https://www.beatport.com/search/tracks?q={artist}%20{track}'
-                
                 # Use Beatport-specific filtering (less strict than before)
-                print(f"🎯 Beatport: Checking relevance filter...")
-                print(f"    Search: artist='{artist}', track='{track}'")
-                print(f"    Found: title='{title}', artists='{artists}'")
                 is_relevant = beatport_strict_filter(artist, track, album, title, artists, album)
-                print(f"✅ Beatport: Filter result: {is_relevant}")
                 
                 if is_relevant:  # Only include matches that pass Beatport filter
-                    print(f"✅ Beatport: Track passed filter, adding to candidates")
                     candidate = {
                         'platform': 'Beatport',
                         'title': title,
@@ -460,15 +374,13 @@ def search_beatport(artist, track, album=""):
                         'label': label,
                         'price': price,
                         'cover_url': cover_url,
-                        'url': track_url,  # Use extracted real URL
+                        'url': f'https://www.beatport.com/track/{title.lower().replace(" ", "-")}',
                         'search_time': 2.0,
                         'relevance_score': 8  # Fixed score for valid matches
                     }
                     candidates.append(candidate)
-                else:
-                    print(f"❌ Beatport: Track failed filter, skipping")
             except Exception as e:
-                print(f"❌ Beatport: Error processing result: {e}")
+                print(f"Error processing Beatport row: {e}")
                 continue
         
         driver.quit()
@@ -480,11 +392,10 @@ def search_beatport(artist, track, album=""):
             # Remove score from final result (internal use only)
             best_result.pop('relevance_score', None)
             best_result['search_time'] = elapsed_time
-            print(f"⏱️ Beatport: {best_result['title']} ({elapsed_time:.2f}s)")
+            print(f"✅ Beatport result: {elapsed_time:.3f}s -> {best_result['title']}")
             return [best_result]
         else:
-            print(f"❌ Beatport: No candidates passed filter")
-            print(f"⏱️ Beatport: Kein Treffer ({elapsed_time:.2f}s)")
+            print(f"❌ Beatport no results: {elapsed_time:.3f}s")
             return [{
                 'platform': 'Beatport',
                 'title': 'Kein Treffer',
@@ -529,7 +440,7 @@ def search_beatport(artist, track, album=""):
     
     except Exception as e:
         elapsed_time = time.time() - locals().get('start_time', time.time())
-# Performance timing only
+        print(f"❌ Beatport scraper error: {e} (after {elapsed_time:.3f}s)")
         return [{
             'platform': 'Beatport',
             'title': '❌ Beatport Suche nicht verfügbar',
@@ -557,12 +468,12 @@ def extract_bandcamp_price(driver, item_url):
         driver.execute_script("window.open('');")
         driver.switch_to.window(driver.window_handles[-1])
         
-        # ULTRA-FAST timeout for track page
-        driver.set_page_load_timeout(2)         # 3s → 2s (-33%)
+        # Shorter timeout for track page
+        driver.set_page_load_timeout(3)
         driver.get(item_url)
         
-        # AGGRESSIVE wait for buy section
-        wait = WebDriverWait(driver, 2)         # 3s → 2s (-33%)
+        # Optimized wait for buy section
+        wait = WebDriverWait(driver, 3)
         
         try:
             # Wait for buy section to load
@@ -624,7 +535,7 @@ def extract_bandcamp_price(driver, item_url):
         return price
         
     except Exception as e:
-# Performance timing only
+        print(f"❌ Error extracting Bandcamp price: {e}")
         # Make sure we're back to main window
         try:
             if len(driver.window_handles) > 1:
@@ -644,7 +555,7 @@ def search_bandcamp(artist, track):
         from selenium.webdriver.support import expected_conditions as EC
         import time
         
-# Performance timing only
+        print(f"🎼 Bandcamp search: '{artist}' - '{track}'")
         start_time = time.time()
         
         url = f"https://bandcamp.com/search?q={artist}%20{track}"
@@ -655,30 +566,52 @@ def search_bandcamp(artist, track):
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
         
-        # Bandcamp-specific balanced optimizations (not over-aggressive)
-        options.add_argument('--page-load-strategy=eager')  # Keep this - it works
+        # Performance optimizations for faster loading
+        options.add_argument('--disable-features=VizDisplayCompositor')
         options.add_argument('--disable-background-timer-throttling')
         options.add_argument('--disable-renderer-backgrounding')
-        options.add_argument('--disable-extensions')
-        options.add_argument('--window-size=1280,720')  # Smaller window
+        options.add_argument('--disable-backgrounding-occluded-windows')
+        options.add_argument('--disable-ipc-flooding-protection')
+        options.add_argument('--dns-prefetch-disable')
+        options.add_argument('--disable-default-apps')
         
-        # Remove image blocking - can cause layout issues on Bandcamp
-        # Keep notifications disabled only
+        # 1) DOM-ready strategy - stop at DOM complete, not all resources
+        options.add_argument('--page-load-strategy=eager')
+        
+        # 2) Block images and CSS for faster loading (we only need URLs from HTML)
+        options.add_argument('--blink-settings=imagesEnabled=false')
+        options.add_argument('--disable-extensions')
+        
+        # 3) JavaScript optimizations - block unnecessary resources
         options.add_experimental_option("prefs", {
+            "profile.managed_default_content_settings.images": 2,  # Block images
             "profile.default_content_setting_values.notifications": 2,  # Block notifications
             "profile.default_content_settings.popups": 0  # Block popups
         })
         
         driver = webdriver.Chrome(options=options)
         
-        # ULTRA-FAST timeouts for Bandcamp 
-        driver.implicitly_wait(1)                    # 2s → 1s (-50%)
-        driver.set_page_load_timeout(3)              # 4s → 3s (-25%)
+        # 4) Reduce implicit wait time (applies to all find_element calls)
+        driver.implicitly_wait(2)  # Down from default 15s
         
-        driver.get(url)
+        # Set shorter page load timeout
+        driver.set_page_load_timeout(5)  # Down from unlimited
         
-        # AGGRESSIVE wait time for <4s target
-        wait = WebDriverWait(driver, 2)              # 4s → 2s (-50%)
+        # Force IPv4 to avoid IPv6 timeout delays
+        import socket
+        original_getaddrinfo = socket.getaddrinfo
+        def getaddrinfo_ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
+            return original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+        socket.getaddrinfo = getaddrinfo_ipv4_only
+        
+        try:
+            driver.get(url)
+        finally:
+            # Restore original getaddrinfo
+            socket.getaddrinfo = original_getaddrinfo
+        
+        # Reduced explicit wait time
+        wait = WebDriverWait(driver, 5)  # Down from 15s
         
         # Check if there are any results first, instead of waiting for elements that might not exist
         try:
@@ -690,7 +623,7 @@ def search_bandcamp(artist, track):
             page_source = driver.page_source.lower()
             if "no results" in page_source or "keine ergebnisse" in page_source or len(page_source) > 1000:
                 # Page loaded successfully but no results found
-# Performance timing only
+                print(f"📭 Bandcamp no results: No search results found")
                 driver.quit()
                 elapsed_time = time.time() - start_time
                 return [{
@@ -711,7 +644,7 @@ def search_bandcamp(artist, track):
         results = []
         candidates = []  # Collect top 3 candidates for relevance scoring
         
-        for result in search_results[:1]:  # SPEED: Only 1 result - Bandcamp sorts very well by relevance
+        for result in search_results[:3]:  # Process top 3 for relevance scoring
             try:
                 title = result.find_element(By.CSS_SELECTOR, '.heading a').text.strip()
                 
@@ -772,10 +705,10 @@ def search_bandcamp(artist, track):
             # Remove score from final result (internal use only)
             best_result.pop('relevance_score', None)
             best_result['search_time'] = elapsed_time
-            print(f"⏱️ Bandcamp: {best_result['title']} ({elapsed_time:.2f}s)")
+            print(f"✅ Bandcamp result: {elapsed_time:.3f}s -> {best_result['title']}")
             return [best_result]
         else:
-            print(f"⏱️ Bandcamp: Kein Treffer ({elapsed_time:.2f}s)")
+            print(f"❌ Bandcamp no results: {elapsed_time:.3f}s")
             return [{
                 'platform': 'Bandcamp',
                 'title': 'Kein Treffer',
@@ -819,7 +752,7 @@ def search_bandcamp(artist, track):
             }]
     
     except Exception as e:
-# Performance timing only
+        print(f"❌ Bandcamp scraper error: {e}")
         return [{
             'platform': 'Bandcamp',
             'title': '❌ Bandcamp Suche nicht verfügbar',
@@ -843,7 +776,7 @@ def search_traxsource(artist, track):
         from selenium.webdriver.support import expected_conditions as EC
         import time
         
-# Performance timing only
+        print(f"🎶 Traxsource search: '{artist}' - '{track}'")
         start_time = time.time()
         
         url = f"https://www.traxsource.com/search?term={artist}+{track}"
@@ -853,37 +786,36 @@ def search_traxsource(artist, track):
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
-        
-        # Traxsource-specific speed optimizations
-        options.add_argument('--page-load-strategy=eager')  # Don't wait for all resources
-        options.add_argument('--disable-software-rasterizer')
-        options.add_argument('--disable-background-timer-throttling')
-        options.add_argument('--disable-renderer-backgrounding')
-        options.add_argument('--disable-backgrounding-occluded-windows')
-        options.add_argument('--window-size=1280,720')  # Smaller window for speed
+        # Keep JavaScript/CSS enabled for Traxsource compatibility
         
         driver = webdriver.Chrome(options=options)
         
-        # Aggressive timeouts for Traxsource (since IPv4 optimization not needed)
-        driver.implicitly_wait(2)
-        driver.set_page_load_timeout(6)  # Traxsource is slow, but 6s should be enough
+        # Force IPv4 to avoid IPv6 timeout delays
+        import socket
+        original_getaddrinfo = socket.getaddrinfo
+        def getaddrinfo_ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
+            return original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+        socket.getaddrinfo = getaddrinfo_ipv4_only
         
-        driver.get(url)
-        
-        # Reduced wait time since we're not getting IPv6 benefits
-        wait = WebDriverWait(driver, 4)  # 10s → 4s
-        
-        # Optimized element loading - don't wait for ALL elements
         try:
-            # Wait for first track row to appear, then get up to 3 results quickly
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div.trk-row')))
-            track_rows = driver.find_elements(By.CSS_SELECTOR, 'div.trk-row')[:3]  # Only process first 3
+            driver.get(url)
+        finally:
+            # Restore original getaddrinfo
+            socket.getaddrinfo = original_getaddrinfo
+            
+        wait = WebDriverWait(driver, 10)
+        
+        # Check if there are any results first, instead of waiting for elements that might not exist
+        try:
+            track_rows = wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div.trk-row'))
+            )
         except:
             # No track rows found - check if this is "no results" or a real error
             page_source = driver.page_source.lower()
             if "no results" in page_source or "no tracks found" in page_source or len(page_source) > 1000:
                 # Page loaded successfully but no results found
-# Performance timing only
+                print(f"📭 Traxsource no results: No tracks found for search")
                 driver.quit()
                 elapsed_time = time.time() - start_time
                 return [{
@@ -922,44 +854,6 @@ def search_traxsource(artist, track):
                 except:
                     cover_url = ''
                 
-                # Extract real track URL from the page
-                track_url = ""
-                try:
-                    # Try different selectors for Traxsource track links
-                    link_selectors = [
-                        'div.title a',             # Most common - title link
-                        'a[href*="/title/"]',      # Direct title link
-                        '.trk-cell .title a',     # Track cell title link  
-                        'a.track-link'             # Generic track link class
-                    ]
-                    
-                    for selector in link_selectors:
-                        try:
-                            link_elem = row.find_element(By.CSS_SELECTOR, selector)
-                            href = link_elem.get_attribute('href')
-                            if href and ('/title/' in href or '/track/' in href):
-                                track_url = href
-                                break
-                        except:
-                            continue
-                    
-                    # If no direct link found, try all links in row
-                    if not track_url:
-                        all_links = row.find_elements(By.TAG_NAME, 'a')
-                        for link in all_links:
-                            href = link.get_attribute('href')
-                            if href and ('/title/' in href or '/track/' in href):
-                                track_url = href
-                                break
-                    
-                    # Fallback: construct URL if no real link found
-                    if not track_url:
-                        track_url = f'https://traxsource.com/track/{title.lower().replace(" ", "-")}'
-                        
-                except Exception as e:
-                    print(f"Error extracting Traxsource URL: {e}")
-                    track_url = f'https://traxsource.com/track/{title.lower().replace(" ", "-")}'
-                
                 # Calculate relevance score for this result
                 score = calculate_relevance_score(artist, track, title, artists, label)
                 
@@ -972,7 +866,7 @@ def search_traxsource(artist, track):
                         'label': label,
                         'price': price,
                         'cover_url': cover_url,
-                        'url': track_url,  # Use extracted real URL
+                        'url': f'https://traxsource.com/track/{title.lower().replace(" ", "-")}',
                         'search_time': 1.0,
                         'relevance_score': score
                     }
@@ -990,10 +884,10 @@ def search_traxsource(artist, track):
             # Remove score from final result (internal use only)
             best_result.pop('relevance_score', None)
             best_result['search_time'] = elapsed_time
-            print(f"⏱️ Traxsource: {best_result['title']} ({elapsed_time:.2f}s)")
+            print(f"✅ Traxsource result: {elapsed_time:.3f}s -> {best_result['title']}")
             return [best_result]
         else:
-            print(f"⏱️ Traxsource: Kein Treffer ({elapsed_time:.2f}s)")
+            print(f"❌ Traxsource no results: {elapsed_time:.3f}s")
             return [{
                 'platform': 'Traxsource',
                 'title': 'Kein Treffer',
@@ -1037,7 +931,7 @@ def search_traxsource(artist, track):
             }]
     
     except Exception as e:
-# Performance timing only
+        print(f"❌ Traxsource scraper error: {e}")
         return [{
             'platform': 'Traxsource',
             'title': '❌ Traxsource Suche nicht verfügbar',
@@ -1061,7 +955,7 @@ def search_revibed(artist, album):
         from selenium.webdriver.support import expected_conditions as EC
         import time
         
-# Performance timing only
+        print(f"💿 Revibed search: artist='{artist}' album='{album}'")
         start_time = time.time()
         
         # Revibed search logic: Priority Artist first, then Album (not combined!)
@@ -1086,73 +980,70 @@ def search_revibed(artist, album):
                 'message': "Für Revibed-Suche muss mindestens Album ODER Artist ausgefüllt sein."
             }]
         
-        # FIXED URL structure for Revibed (corrected format)
-        encoded_query = search_query.replace(' ', '+')
-        url = f"https://revibed.com/marketplace/buy-now-rare-vinyl-records-cds-&-cassette-tapes?query={encoded_query}&sort=totalPurchasesCount%2CDESC&size=25&page=0"
+        url = f"https://revibed.com/marketplace/buy-now-rare-vinyl-records-cds-&-cassette-tapes?query={search_query.replace(' ', '+')}&sort=totalPurchasesCount%2CDESC&size=25&page=0"
         
         options = webdriver.ChromeOptions()
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
-        
-        # ULTRA AGGRESSIVE SPEED OPTIMIZATIONS for <4s target (Revibed specific)
-        options.add_argument('--disable-images')
-        # options.add_argument('--disable-javascript')  # Disabled for now - might break selectors
-        options.add_argument('--disable-plugins')
-        options.add_argument('--disable-extensions')
-        options.add_argument('--disable-background-timer-throttling')
-        options.add_argument('--disable-backgrounding-occluded-windows')
-        options.add_argument('--disable-renderer-backgrounding')
-        options.add_argument('--disable-features=TranslateUI,VizDisplayCompositor')
-        options.add_argument('--disable-ipc-flooding-protection')
-        options.add_argument('--disable-default-apps')
-        options.add_argument('--disable-sync')
-        options.add_argument('--disable-web-security')
+        # Performance optimizations for faster loading
         options.add_argument('--disable-features=VizDisplayCompositor')
-        options.add_argument('--disable-logging')
-        options.add_argument('--disable-background-networking')
-        options.add_argument('--aggressive-cache-discard')
-        options.add_argument('--window-size=800,600')
-        options.add_argument('--page-load-strategy=none')  # Don't wait for full page load
+        options.add_argument('--disable-background-timer-throttling')
+        options.add_argument('--disable-renderer-backgrounding')
+        options.add_argument('--disable-backgrounding-occluded-windows')
+        options.add_argument('--disable-ipc-flooding-protection')
+        # Reduce timeout-related delays
+        options.add_argument('--dns-prefetch-disable')
+        options.add_argument('--disable-default-apps')
         
-        # Network optimizations
+        # 1) DOM-ready strategy - stop at DOM complete, not all resources
+        options.add_argument('--page-load-strategy=eager')
+        
+        # 2) Block images and CSS for faster loading (we only need URLs from HTML)
+        options.add_argument('--blink-settings=imagesEnabled=false')
+        options.add_argument('--disable-extensions')
+        
+        # 3) JavaScript optimizations - block unnecessary resources
         options.add_experimental_option("prefs", {
-            "profile.default_content_setting_values.notifications": 2,
-            "profile.managed_default_content_settings.images": 2,
-            "profile.default_content_setting_values.plugins": 2,
-            "profile.default_content_setting_values.popups": 2,
+            "profile.managed_default_content_settings.images": 2,  # Block images
+            "profile.default_content_setting_values.notifications": 2,  # Block notifications
+            "profile.default_content_settings.popups": 0,  # Block popups
+            "profile.default_content_settings.media_stream": 2,  # Block media
+            "profile.default_content_settings.plugins": 2,  # Block plugins
+            "profile.default_content_settings.geolocation": 2,  # Block location
         })
         
+        # Additional speed optimizations
+        options.add_argument('--disable-logging')
+        options.add_argument('--disable-web-security')
+        options.add_argument('--aggressive-cache-discard')
+        options.add_argument('--disable-background-networking')
+        options.add_argument('--disable-sync')
+        
         driver = webdriver.Chrome(options=options)
-        setup_time = time.time() - start_time
-        print(f"DEBUG Revibed: Driver setup took {setup_time:.2f}s")
         
-        # ULTRA AGGRESSIVE TIMEOUTS for <4s target (Revibed specific)
-        driver.implicitly_wait(0.3)                  # 0.8s → 0.3s (ultra fast for elements)
-        driver.set_page_load_timeout(2.5)            # 3s → 2.5s 
+        # 4) Reduce implicit wait time even further for speed
+        driver.implicitly_wait(1)  # Down from 2s to 1s
         
-        page_load_start = time.time()
+        # Set even shorter page load timeout for faster failure detection
+        driver.set_page_load_timeout(3)  # Down from 5s
         driver.get(url)
-        page_load_time = time.time() - page_load_start
-        print(f"DEBUG Revibed: Page load took {page_load_time:.2f}s")
         
-        wait = WebDriverWait(driver, 0.8)            # 1.5s → 0.8s (ultra fast)
+        # Reduced explicit wait time - Revibed is usually fast
+        wait = WebDriverWait(driver, 3)  # Down from 5s to 3s
         
         # Check if there are any results first, instead of waiting for elements that might not exist
         try:
-            element_wait_start = time.time()
-            # FIXED selector - old one was outdated
             items = wait.until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div[class*='marketplace']"))
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.styles_marketplaceGoods__r5WKf"))
             )
-            element_wait_time = time.time() - element_wait_start
-            print(f"DEBUG Revibed: Element wait took {element_wait_time:.2f}s, found {len(items)} items")
         except:
             # No items found - check if this is "no results" or a real error
             page_source = driver.page_source.lower()
             if "no results" in page_source or "keine ergebnisse" in page_source or len(page_source) > 1000:
                 # Page loaded successfully but no results found
+                print(f"📭 Revibed no results: No items found for search")
                 driver.quit()
                 elapsed_time = time.time() - start_time
                 return [{
@@ -1172,45 +1063,8 @@ def search_revibed(artist, album):
         
         results = []
         
-        processing_start = time.time()
-        
-        # ULTRA SPEED HACK: Check page source for search terms first
-        page_text = driver.page_source.lower()
-        search_terms = []
-        if artist and artist.strip():
-            search_terms.append(artist.lower())
-        if album and album.strip():
-            search_terms.append(album.lower())
-        
-        # Early exit if no search terms found in entire page
-        found_terms = [term for term in search_terms if term in page_text]
-        print(f"DEBUG Revibed: Search terms {search_terms}, found terms: {found_terms}")
-        
-        if search_terms and not found_terms:
-            print(f"DEBUG Revibed: No search terms found in page source, early exit")
-            driver.quit()
-            processing_time = time.time() - processing_start
-            print(f"DEBUG Revibed: Processing took {processing_time:.2f}s")
-            elapsed_time = time.time() - start_time
-            print(f"⏱️ Revibed: Kein Treffer ({elapsed_time:.2f}s)")
-            return [{
-                'platform': 'Revibed',
-                'title': 'Kein Treffer',
-                'artist': '',
-                'album': '',
-                'label': '',
-                'price': '',
-                'cover_url': '',
-                'url': '',
-                'search_time': elapsed_time
-            }]
-        
-        for item in items[:1]:  # ULTRA SPEED: Only 1 result for <4s target (was 2)
+        for item in items[:3]:  # First 3 results as requested
             try:
-                # ULTRA FAST extraction - minimal DOM queries
-                element_start = time.time()
-                
-                # Only do expensive DOM queries if quick match succeeded
                 try:
                     title = item.find_element(By.CSS_SELECTOR, ".styles_projectNames__project__title__D49o3").text.strip()
                 except:
@@ -1221,80 +1075,62 @@ def search_revibed(artist, album):
                 except:
                     album_name = 'N/A'
                 
-                print(f"DEBUG Revibed: Element extraction took {time.time() - element_start:.2f}s")
-                
-                # Optimized image extraction
                 try:
                     cover_url = item.find_element(By.CSS_SELECTOR, "img").get_attribute('src')
                 except:
                     cover_url = ''
                 
-                # Enhanced price extraction with debugging
+                # Extract real price
                 try:
                     price_elem = item.find_element(By.CSS_SELECTOR, ".styles_marketplaceGoods__price__content__NwHxk")
                     price = price_elem.text.strip()
-                    print(f"DEBUG Revibed: Found price with specific selector: {price}")
                 except:
                     try:
-                        # Alternative selector: any element with 'price' in class
+                        # Alternative price selector
                         price_elem = item.find_element(By.CSS_SELECTOR, "[class*='price']")
                         price = price_elem.text.strip()
-                        print(f"DEBUG Revibed: Found price with generic selector: {price}")
                     except:
-                        try:
-                            # Try broader price selectors - look for actual prices first
-                            price_candidates = item.find_elements(By.CSS_SELECTOR, "*")
-                            found_prices = []
-                            
-                            for elem in price_candidates:
-                                elem_text = elem.text.strip()
-                                class_name = elem.get_attribute('class') or ''
-                                
-                                # Look for actual currency symbols first
-                                if '€' in elem_text or '$' in elem_text:
-                                    found_prices.append((elem_text, 'currency', class_name))
-                                elif 'price' in class_name.lower() and elem_text:
-                                    found_prices.append((elem_text, 'class', class_name))
-                            
-                            # Prefer actual currency over button text
-                            if found_prices:
-                                # Sort by priority: currency symbols first
-                                found_prices.sort(key=lambda x: 0 if x[1] == 'currency' else 1)
-                                price = found_prices[0][0]
-                                print(f"DEBUG Revibed: Found price: {price} (type: {found_prices[0][1]}, class: {found_prices[0][2]})")
-                            else:
-                                price = "see link"
-                                print("DEBUG Revibed: No price found with any selector")
-                        except:
-                            price = "see link"
-                            print("DEBUG Revibed: Exception during price search")
+                        price = ""
                 
-                # Fast label extraction
-                label = ""  # Skip for speed
-                
-                # Extract URL quickly
+                # Extract real label
                 try:
-                    url_elem = item.find_element(By.CSS_SELECTOR, "a")
+                    label_elem = item.find_element(By.CSS_SELECTOR, ".styles_projectNames__project__label__IJ3r5")
+                    label = label_elem.text.strip()
+                except:
+                    try:
+                        # Alternative label selector
+                        label_elem = item.find_element(By.CSS_SELECTOR, "[class*='label']")
+                        label = label_elem.text.strip()
+                    except:
+                        label = ""
+
+                # Extract real URL to release page
+                try:
+                    # Look for clickable link within the item
+                    url_elem = item.find_element(By.CSS_SELECTOR, "a[href*='/marketplace/']")
                     release_url = url_elem.get_attribute('href')
-                    if release_url and not release_url.startswith('http'):
+                    if not release_url.startswith('http'):
                         release_url = 'https://revibed.com' + release_url
                 except:
-                    release_url = f'https://revibed.com/item/{title.lower().replace(" ", "-")}'
+                    try:
+                        # Alternative URL selector - look for any link in the item
+                        url_elem = item.find_element(By.CSS_SELECTOR, "a")
+                        release_url = url_elem.get_attribute('href')
+                        if release_url and not release_url.startswith('http'):
+                            release_url = 'https://revibed.com' + release_url
+                    except:
+                        # Fallback to constructed URL if no link found
+                        release_url = f'https://revibed.com/item/{title.lower().replace(" ", "-")}'
                 
-                # FAST filter for <4s target - simplified matching
-                search_match = False
+                # Filter by search keywords (Revibed: Artist OR Album priority)
                 if artist and artist.strip():
-                    # Priority: Artist search - simple case-insensitive contains check
-                    artist_lower = artist.lower()
-                    title_lower = title.lower()
-                    album_lower = album_name.lower()
-                    search_match = artist_lower in title_lower or artist_lower in album_lower
+                    # Priority: Artist search
+                    search_match = flexible_search_match(artist, "", title, "", album_name)
                 elif album and album.strip():
-                    # Fallback: Album search - simple case-insensitive contains check  
-                    album_search_lower = album.lower()
-                    title_lower = title.lower()
-                    album_lower = album_name.lower()
-                    search_match = album_search_lower in title_lower or album_search_lower in album_lower
+                    # Fallback: Album search
+                    search_match = flexible_search_match("", album, title, "", album_name)
+                else:
+                    search_match = False
                     
                 if search_match:
                     results.append({
@@ -1313,8 +1149,6 @@ def search_revibed(artist, album):
                 continue
         
         driver.quit()
-        processing_time = time.time() - processing_start
-        print(f"DEBUG Revibed: Processing took {processing_time:.2f}s")
         elapsed_time = time.time() - start_time
         
         # Return up to 3 results or no results
@@ -1322,10 +1156,10 @@ def search_revibed(artist, album):
             # Add search time to all results
             for result in results:
                 result['search_time'] = elapsed_time
-            print(f"⏱️ Revibed: {len(results)} Treffer ({elapsed_time:.2f}s)")
+            print(f"✅ Revibed results: {elapsed_time:.3f}s -> {len(results)} found")
             return results
         else:
-            print(f"⏱️ Revibed: Kein Treffer ({elapsed_time:.2f}s)")
+            print(f"❌ Revibed no results: {elapsed_time:.3f}s")
             return [{
                 'platform': 'Revibed',
                 'title': 'Kein Treffer',  
@@ -1383,6 +1217,7 @@ def search_revibed(artist, album):
             }]
     
     except Exception as e:
+        print(f"❌ Revibed scraper error: {e}")
         return [{
             'platform': 'Revibed',
             'title': '❌ Revibed Suche nicht verfügbar',
@@ -1500,7 +1335,7 @@ def scrape_discogs_marketplace_offers(
         # PERFORMANCE OPTIMIZATION 1: Deaktiviere Anti-Bot Delays für GemFinder
         scraper.config.use_random_delays = False
         scraper.config.simulate_human_behavior = False
-        print(f"🚀 Performance Mode: Anti-bot delays disabled for speed")
+        print("🚀 Performance Mode: Anti-bot delays disabled for speed")
 
         # user_country in den Scraper-Config schreiben, damit das
         # build von marketplace_url korrekt funktioniert
@@ -1539,11 +1374,11 @@ def scrape_discogs_marketplace_offers(
         return filtered
 
     except ImportError:
-# Performance timing only
+        print("❌ Discogs scraper import error: Production scraper not available")
         return []
 
     except Exception as e:
-# Performance timing only
+        print(f"❌ Discogs scraper error: {e}")
         return []
 
 

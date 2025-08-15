@@ -48,9 +48,7 @@ class DiscogsProvider(SearchProvider):
 
     def search(self, c: SearchCriteria) -> dict:
         """Return releases in consistent dict format like other providers"""
-        print(f"DiscogsProvider: Searching for artist='{c.artist}', title='{c.title}', album='{c.album}'")
         releases = search_discogs_releases(c.artist, c.title, c.album)
-        print(f"DiscogsProvider: Returning {len(releases)} releases")
         
         # Return in consistent format with other providers
         return {
@@ -72,21 +70,26 @@ class RevibedProvider(SearchProvider):
         # 2. Artist
         return bool(c.album or c.artist)
 
-    def search(self, c: SearchCriteria) -> dict:
-        # search_revibed nimmt (artist, album)-Parameter
+    def search(self, c: SearchCriteria) -> list:
+        # search_revibed nimmt (artist, album)-Parameter und gibt jetzt bis zu 3 Ergebnisse zurück
         artist = "" if c.album else c.artist
         hits = search_revibed(artist, c.album)
-        first = hits[0] if hits else {}
-        return {
-            "platform":  self.name,
-            "title":     first.get("title","Kein Treffer"),
-            "artist":    first.get("artist", c.artist),
-            "album":     first.get("album", c.album),
-            "label":     (first.get("label") or [""])[0],
-            "price":     first.get("price",""),
-            "cover_url": first.get("cover_url",""),
-            "url":       first.get("url",""),
-        }
+        
+        # Return list of up to 3 results (or single "no results" item)
+        if hits and hits[0].get("title") != "Kein Treffer":
+            return hits  # Return all results from scraper (up to 3)
+        else:
+            # Return single "no results" item in list format
+            return [{
+                "platform":  self.name,
+                "title":     "Kein Treffer",
+                "artist":    c.artist or "",
+                "album":     c.album or "",
+                "label":     "",
+                "price":     "",
+                "cover_url": "",
+                "url":       "",
+            }]
 
 # —————————————————————————————
 # Digital-Shop-Provider (iTunes, Beatport, Bandcamp, Traxsource)

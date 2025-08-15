@@ -2,6 +2,9 @@
 
 > **Checkliste für die Produktionsreife - Erst ausführen wenn Funktionsumfang vollständig**
 
+reset Button
+paste input 
+(yt discogs)
 ---
 
 ## 🎵 FEATURE IMPROVEMENTS

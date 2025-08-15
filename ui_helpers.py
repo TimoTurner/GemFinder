@@ -1,4 +1,5 @@
 # ui_helpers.py
+import time
 
 def show_live_results():
     """Display live search results as they come in from parallel threads"""
@@ -393,11 +394,13 @@ def search_discogs_offers_simplified(selected_release):
     cache_key = f"all_offers_{release_id}"
     
     if cache_key not in st.session_state:
+        start_time = time.time()
         # Show loading state only for initial load
         with st.spinner(f"Loading and filtering offers for shipping availability..."):
             try:
                 # Use original scraper + Selenium enhancement for shipping/availability
-                offers = scrape_discogs_marketplace_offers(release_id, max_offers=8, user_country=user_location['country'])
+                # PERFORMANCE OPTIMIZATION 4: Reduce max_offers für frühen Exit
+                offers = scrape_discogs_marketplace_offers(release_id, max_offers=6, user_country=user_location['country'])
                 print(f"Scraper returned {len(offers)} offers")
                 
                 # Enhance with Selenium using parallel processing for speed
@@ -413,9 +416,6 @@ def search_discogs_offers_simplified(selected_release):
                 # Process offers - filter out unavailable ones based on shipping info
                 preferred_currency_offers = []
                 for i, offer in enumerate(offers):
-                    # Debug: Print full offer structure to understand data format
-                    if i < 3:  # Only print first 3 offers to avoid spam
-                        print(f"DEBUG Offer {i+1}: {offer}")
                     
                     price_amount, price_currency = parse_price(offer.get('price', ''))
                     
@@ -459,6 +459,8 @@ def search_discogs_offers_simplified(selected_release):
                 
                 # Store all offers in session state for quality filtering
                 st.session_state[cache_key] = preferred_currency_offers
+                elapsed_time = time.time() - start_time
+                print(f"⏱️ Offers search completed in {elapsed_time:.2f}s - found {len(preferred_currency_offers)} offers")
                 
             except Exception as e:
                 st.error(f"❌ Error loading offers: {str(e)}")
@@ -471,14 +473,13 @@ def search_discogs_offers_simplified(selected_release):
         else:
             preferred_currency_offers = st.session_state[cache_key]
         
-        # Sort by total price
+        # Sort by total price (item + shipping) - Discogs only sorts by item price
         preferred_currency_offers.sort(key=lambda x: x.get('total_amount', 0))
         
-        # Display offers directly (no stats, no buttons)
+        # Display first 5 offers (performance optimization)
         if preferred_currency_offers:
-            for i, offer in enumerate(preferred_currency_offers[:10], 1):
-                # Debug: Print offer URL to console
-                print(f"Offer {i} URL: {offer.get('offer_url', 'NO URL')}")
+            st.caption(f"Showing first 5 of {len(preferred_currency_offers)} available offers (sorted by lowest total price)")
+            for i, offer in enumerate(preferred_currency_offers[:5], 1):
                 display_single_offer_clean(offer, i, preferred_currency, selected_release)
         else:
             quality_msg = " in VG+ or better condition" if high_quality_only else ""
@@ -863,10 +864,36 @@ def get_intensity_color(count, color_type):
 
 
 
-def show_discogs_block(releases, track_for_search):
+def show_discogs_block(releases, track_for_search, is_real_gem=False):
     """Enhanced Discogs block with all features - consolidated from combined version"""
     PLACEHOLDER_COVER = "cover_placeholder.png"
     NO_HIT_COVER = "not_found.png"
+    
+    # Show real gem message if this is a real gem scenario
+    if is_real_gem and releases:
+        st.success("🎉 **You found a real gem!** 💎")
+        # Auto-play audio using JavaScript with MP3
+        try:
+            with open("small-applause.mp3", "rb") as audio_file:
+                audio_data = audio_file.read()
+            import base64
+            audio_b64 = base64.b64encode(audio_data).decode()
+            
+            # Use JavaScript to force audio playback with MP3
+            st.markdown(f"""
+            <script>
+            setTimeout(function() {{
+                var audio = new Audio('data:audio/mp3;base64,{audio_b64}');
+                audio.volume = 0.7;
+                audio.play().catch(function(e) {{
+                    console.log('Audio play failed:', e);
+                }});
+            }}, 200);
+            </script>
+            """, unsafe_allow_html=True)
+            pass  # Audio setup completed
+        except Exception as e:
+            pass  # Audio setup failed silently
     
     # Enhanced headers on same line (from combined version)
     header_col1, header_col2 = st.columns([1, 1])
@@ -876,9 +903,7 @@ def show_discogs_block(releases, track_for_search):
         st.markdown("#### Available offers in your currency")
     
     # Debug info for monitoring (from combined version)
-    print(f"UI: Received {len(releases)} releases from API")
-    for i, r in enumerate(releases[:3]):
-        print(f"UI Release {i+1}: ID={r.get('id')}, Title={r.get('title')}")
+    pass
     
     if releases:
         # Two-column layout: Release info on left, offers on right
@@ -889,9 +914,9 @@ def show_discogs_block(releases, track_for_search):
             if "release_selected_idx" not in st.session_state:
                 st.session_state.release_selected_idx = 0
                 
-            # Radio button selection without label - back to working version
+            # Radio button selection with hidden label for accessibility
             selected_idx = st.radio(
-                "",  # Empty label
+                "Select Release",  # Non-empty label
                 options=list(range(len(releases))),
                 index=st.session_state.get("release_selected_idx", 0),
                 format_func=lambda i: (
@@ -899,12 +924,13 @@ def show_discogs_block(releases, track_for_search):
                     f" – {releases[i].get('label', ['-'])[0] if releases[i].get('label') else '-'}"
                     f" ({releases[i].get('year', '-')})"
                 ),
-                key="release_select"
+                key="release_select",
+                label_visibility="hidden"
             )
             
             # Check if selection changed - ADD RERUN but keep offers persistent
             if selected_idx != st.session_state.get("release_selected_idx", 0):
-                print(f"🔘 RADIO: Selection changed from {st.session_state.get('release_selected_idx', 0)} to {selected_idx}")
+                pass
                 st.session_state.release_selected_idx = selected_idx
                 # DON'T reset offers display - let them persist so buttons keep working
                 # st.session_state.show_offers = False  # KEEP DISABLED - this was breaking buttons
@@ -989,19 +1015,27 @@ def show_discogs_block(releases, track_for_search):
         if selected_idx < len(releases):
             r = releases[selected_idx]
             
-            # Get full tracklist from details API with caching
+            # Get full tracklist from details API with on-demand loading
             release_id = r.get("id")
             if release_id:
-                # Use the same cached details from above
+                # Load tracklist on-demand when user selects a release
                 cache_key = f"release_details_{release_id}"
                 if cache_key in st.session_state:
                     details = st.session_state[cache_key]
                     full_tracklist = details.get("tracklist", [])
                 else:
-                    # Fallback if somehow not cached yet
-                    full_tracklist = r.get("tracklist", [])
+                    # Load tracklist details now (on-demand)
+                    try:
+                        print(f"Loading tracklist details for release {release_id}...")
+                        from api_search import get_discogs_release_details
+                        details = get_discogs_release_details(release_id)
+                        st.session_state[cache_key] = details
+                        full_tracklist = details.get("tracklist", [])
+                    except Exception as e:
+                        print(f"Error loading tracklist: {e}")
+                        full_tracklist = []
             else:
-                full_tracklist = r.get("tracklist", [])
+                full_tracklist = []
             
             with release_col:
                 if full_tracklist:
@@ -1017,8 +1051,45 @@ def show_discogs_block(releases, track_for_search):
                             track_title = str(t)
                             duration = ""
                         
-                        # Check if this is the searched track
-                        if track_title and track_title.lower() == track_for_search.strip().lower():
+                        # Check if this is the searched track (flexible matching)
+                        def is_track_match(search_term, track_title):
+                            if not search_term or not track_title:
+                                return False
+                            
+                            # Normalize both strings for comparison
+                            search_clean = search_term.lower().strip()
+                            track_clean = track_title.lower().strip()
+                            
+                            # Direct match
+                            if search_clean == track_clean:
+                                return True
+                            
+                            # Remove common remix/version suffixes for comparison
+                            remix_patterns = [
+                                r'\s*\(.*remix.*\)', r'\s*\(.*mix.*\)', r'\s*\(.*edit.*\)',
+                                r'\s*\(.*version.*\)', r'\s*\(original\)', r'\s*\(feat\..*\)',
+                                r'\s*feat\..*', r'\s*featuring.*', r'\s*ft\..*'
+                            ]
+                            
+                            import re
+                            track_base = track_clean
+                            search_base = search_clean
+                            
+                            for pattern in remix_patterns:
+                                track_base = re.sub(pattern, '', track_base).strip()
+                                search_base = re.sub(pattern, '', search_base).strip()
+                            
+                            # Check if base versions match
+                            if search_base == track_base:
+                                return True
+                            
+                            # Check if search term is contained in track title (partial match)
+                            if search_base in track_base or track_base in search_base:
+                                return True
+                            
+                            return False
+                        
+                        if is_track_match(track_for_search, track_title):
                             # Highlight searched track in red
                             track_line = f"{position} {track_title}" if position else track_title
                             tracklist_text += f":red[**{track_line}**]  \n"
@@ -1033,25 +1104,23 @@ def show_discogs_block(releases, track_for_search):
                 current_offers_state = st.session_state.get("show_offers", False)
                 current_offers_release = st.session_state.get("offers_for_release", None)
                 
-                print(f"🔍 PRE-BUTTON: selected_idx={selected_idx}, show_offers={current_offers_state}, offers_for_release={current_offers_release}")
-                
                 if st.button("Search for Offers", key=search_button_key):
                     st.session_state.show_offers = True
                     st.session_state.offers_for_release = selected_idx
-                    print(f"🔍 BUTTON CLICKED: Search button clicked for release {selected_idx}")
-                    print(f"🔍 POST-BUTTON: show_offers={st.session_state.show_offers}, offers_for_release={st.session_state.offers_for_release}")
-                    # st.rerun() KOMPLETT ENTFERNT - teste was passiert
+                    st.rerun()
                 
-                # Add Revibed search button below - simple key
-                revibed_button_key = f"search_revibed_btn_{selected_idx}"
-                if st.button("Search on revibed to artist or album", key=revibed_button_key):
-                    st.session_state.trigger_revibed_search = True
-                    print(f"🔍 BUTTON: Revibed button clicked")
-                    st.rerun()  # Nötig für Handler
         st.markdown("---")
     else:
         st.image(NO_HIT_COVER, width=92)
         st.info("Keine Discogs-Releases gefunden.")
+        st.warning("Please check your spelling")
+    
+    # Revibed search button - ALWAYS available, independent of Discogs results
+    revibed_button_key = f"search_revibed_btn_global"  # Global key since it's not tied to specific release
+    st.markdown("### Revibed Search")
+    if st.button("Search on revibed to artist or album", key=revibed_button_key):
+        st.session_state.trigger_revibed_search = True
+        st.rerun()
     
     # Revibed search handled by main.py handler
 
@@ -1061,9 +1130,9 @@ def show_discogs_block(releases, track_for_search):
 # - show_discogs_block() for enhanced Discogs display
 # - show_revibed_fragment() for parallel Revibed loading
 
-@st.fragment(run_every=0.05)
+@st.fragment
 def show_offers_fragment(releases, selected_idx):
-    """Fragment für Offers-Anzeige - 50ms Update-Zyklus für sofortige Reaktion"""
+    """Fragment für Offers-Anzeige - Event-basierte Updates"""
     # Track state changes for immediate updates
     offers_state = st.session_state.get("show_offers", False)
     offers_release = st.session_state.get("offers_for_release", None)
@@ -1072,14 +1141,13 @@ def show_offers_fragment(releases, selected_idx):
     should_show_offers = (selected_idx < len(releases) and offers_state and offers_release == selected_idx)
     
     if should_show_offers:
-        print(f"📦 FRAGMENT: *** SHOWING OFFERS *** for release {selected_idx}")
         search_discogs_offers_simplified(releases[selected_idx])
     elif selected_idx < len(releases):
         st.info("Click 'Search for Offers' to see marketplace listings")
 
 # Revibed search fragment entfernt - zurück zum Handler-System
 
-@st.fragment(run_every=2)
+@st.fragment
 def show_revibed_fragment(revibed_results):
     """Pure Revibed fragment with back button - enables parallel loading"""
     # Check if there are any Revibed hits for display logic
@@ -1089,41 +1157,56 @@ def show_revibed_fragment(revibed_results):
     real_revibed_hits = [r for r in revibed_results if is_real_revibed_hit(r)]
     has_revibed_hits = len(real_revibed_hits) > 0
     
-    st.markdown("#### Revibed: Treffer zu Artist und Release")
+    st.markdown("#### Revibed Results")
     
     if has_revibed_hits:
-        # Style like digital releases
+        # Use same layout as digital platforms
         for entry in real_revibed_hits:
-            st.markdown("""
-                <div style="margin-bottom:1.7em; border:1px solid #e2e6ed; border-radius:14px; padding:0.7em 1.1em; box-shadow:0 2px 16px #d8f7fd40;">
-                    <div style="font-size:1.1em; font-weight:bold; color:#1ad6cc; margin-bottom:0.5em;">
-                        Revibed
-                    </div>
-                    {cover_image}
-                    <span style="font-weight:600;">{title}</span><br>
-                    <span style="color:#666;">{artist}</span><br>
-                    <span style="color:#333;">{album}</span><br>
-                    <span style="color:#aaa;">{label}</span><br>
-                    <span style="color:#1ad64a; font-weight:600; font-size:1.07em;">
-                        {price}
-                    </span><br>
-                </div>
-            """.format(
-                cover_image="<a href='{}' target='_blank'><img src='{}' style='width:100px; margin-bottom:0.6em; border-radius:9px; box-shadow:0 2px 10px #e4f8ff;'></a><br>".format(entry.get('url',''), entry.get('cover_url','') or entry.get('cover','')) if (entry.get("cover_url") or entry.get("cover")) else "",
-                title=entry.get('title', ''),
-                artist=entry.get('artist', ''),
-                album=entry.get('album', ''),
-                label=entry.get('label', ''),
-                price=entry.get('price', '')
-            ), unsafe_allow_html=True)
+            # Extract data
+            title_str = str(entry.get("title", ""))
+            artist_str = str(entry.get("artist", ""))
+            album_str = str(entry.get("album", ""))
+            label_str = str(entry.get("label", ""))
+            price_str = str(entry.get("price", ""))
+            cover_url = entry.get("cover_url", "") or entry.get("cover", "")
+            release_url = entry.get("url", "").strip()
+            
+            # Use placeholder if no cover
+            if not cover_url or not cover_url.strip():
+                cover_url = "cover_placeholder.png"
+            
+            # Display result with same columns layout as digital platforms
+            cols = st.columns([1, 5])
+            with cols[0]:
+                st.image(cover_url, width=92)
+            with cols[1]:
+                if release_url:
+                    st.markdown(f"[**Revibed**]({release_url})")
+                else:
+                    st.markdown("**Revibed**")
+                
+                if title_str:
+                    st.markdown(f"**{title_str}**")
+                if artist_str:
+                    st.markdown(f"{artist_str}")
+                if album_str:
+                    st.markdown(f"*{album_str}*")
+                if label_str:
+                    st.markdown(f"`{label_str}`")
+                if price_str and release_url:
+                    st.markdown(f"[{price_str}]({release_url})")
+                elif price_str:
+                    st.markdown(f":green[{price_str}]")
+            
+            st.markdown("---")
     else:
-        st.markdown("""
-            <div style="margin-bottom:1.7em; border:1px solid #e2e6ed; border-radius:14px; padding:0.7em 1.1em; box-shadow:0 2px 16px #d8f7fd40;">
-                <div style="font-size:1.1em; font-weight:bold; color:#1ad6cc; margin-bottom:0.5em;">
-                    Revibed
-                </div>
-                <span style="color:#666;">Keine Treffer</span>
-            </div>
-        """, unsafe_allow_html=True)
+        # Show no results with same layout as digital platforms
+        cols = st.columns([1, 5])
+        with cols[0]:
+            st.image("not_found.png", width=92)
+        with cols[1]:
+            st.markdown("**Revibed**")
+            st.markdown("Keine Treffer")
+        st.markdown("---")
 
     # Zurück-Button ist jetzt außerhalb des Fragments in main.py implementiert

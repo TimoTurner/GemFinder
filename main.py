@@ -25,6 +25,352 @@ from utils import get_platform_info, is_fuzzy_match
 
 from state_manager import AppState
 
+# --- Helper function to fix common copy-paste errors ---
+def fix_common_paste_errors(text):
+    """
+    Fix common human errors in copy-pasted music data
+    """
+    import re
+    
+    if not text:
+        return text
+    
+    # 1. Fix multiple spaces (common in copy-paste)
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # 2. Fix missing spaces around common separators
+    # "Artist-Title" → "Artist - Title"
+    text = re.sub(r'([a-zA-Z])([–—-])([a-zA-Z])', r'\1 \2 \3', text)
+    
+    # 3. Fix double separators (common typo)
+    # "Artist -- Title" → "Artist - Title"
+    text = re.sub(r'[-–—]{2,}', '-', text)
+    
+    # 4. Fix spaces before punctuation (common in OCR/copy-paste)
+    # "Artist - Title (" → "Artist - Title ("
+    text = re.sub(r'\s+([.,;:!?\)\]])', r'\1', text)
+    text = re.sub(r'([\(\[])\s+', r'\1', text)
+    
+    # 5. Fix common word separations (OCR errors)
+    # "D aft Punk" → "Daft Punk"
+    text = re.sub(r'\b([A-Z])\s+([a-z]{2,})', r'\1\2', text)
+    
+    # 6. Fix catalog number spacing issues
+    # "ENV010" → "ENV 010", "E NV 010" → "ENV 010"
+    text = re.sub(r'\b([A-Z]{2,6})(\d{2,6})\b', r'\1 \2', text)
+    text = re.sub(r'\b([A-Z])\s+([A-Z]{1,5})\s+(\d{2,6})\b', r'\1\2 \3', text)
+    
+    # 7. Fix common feat/featuring spacing issues
+    # "Artistfeat." → "Artist feat.", "feat.Artist" → "feat. Artist"
+    text = re.sub(r'([a-zA-Z])(feat\.?|ft\.?)', r'\1 \2', text, flags=re.IGNORECASE)
+    text = re.sub(r'(feat\.?|ft\.?)([A-Z])', r'\1 \2', text, flags=re.IGNORECASE)
+    
+    # 8. Fix parentheses spacing
+    # "Title( Mix)" → "Title (Mix)", "Title (Mix )" → "Title (Mix)"
+    text = re.sub(r'([a-zA-Z])\s*\(\s*', r'\1 (', text)
+    text = re.sub(r'\s*\)\s*', r') ', text)
+    text = re.sub(r'\)\s*$', r')', text)  # Remove trailing space after last parenthesis
+    
+    # 9. Fix bracket spacing
+    text = re.sub(r'([a-zA-Z])\s*\[\s*', r'\1 [', text)
+    text = re.sub(r'\s*\]\s*', r'] ', text)
+    text = re.sub(r'\]\s*$', r']', text)
+    
+    # 10. Fix common remix/mix formatting
+    # "Original mix" → "Original Mix" (proper capitalization)
+    text = re.sub(r'\b(original|radio|extended|club|dub|instrumental)\s+(mix|edit|version)\b', 
+                 lambda m: f"{m.group(1).title()} {m.group(2).title()}", text, flags=re.IGNORECASE)
+    
+    # 11. Fix ampersand spacing
+    # "Artist&Artist" → "Artist & Artist", "Artist &Artist" → "Artist & Artist"
+    text = re.sub(r'([a-zA-Z])&([a-zA-Z])', r'\1 & \2', text)
+    text = re.sub(r'\s+&\s*([a-zA-Z])', r' & \1', text)
+    text = re.sub(r'([a-zA-Z])\s*&\s+', r'\1 & ', text)
+    
+    # 12. Fix "vs" spacing issues
+    text = re.sub(r'([a-zA-Z])vs\.?([a-zA-Z])', r'\1 vs. \2', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s+vs\.?\s*([a-zA-Z])', r' vs. \1', text, flags=re.IGNORECASE)
+    
+    # 13. Final cleanup
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
+
+# --- Helper function for intelligent copy-paste parsing ---
+def parse_music_data(text):
+    """
+    Intelligently parse copy-pasted music data and extract fields.
+    Supports various formats like:
+    - "Artist - Title"
+    - "Artist - Album - Title"
+    - "Title by Artist"
+    - "Artist: Title"
+    - Discogs URLs
+    - Beatport URLs
+    - Multi-line formats
+    """
+    import re
+    
+    if not text or not text.strip():
+        return {}
+    
+    text = text.strip()
+    result = {}
+    
+    # Pre-processing: Fix common copy-paste errors
+    text = fix_common_paste_errors(text)
+    
+    # Check for URLs first
+    if "discogs.com" in text.lower():
+        # Extract from Discogs URL
+        if "/release/" in text:
+            # Try to extract release info from URL structure
+            match = re.search(r'/release/(\d+)', text)
+            if match:
+                result["catalog_number"] = match.group(1)
+        return result
+    
+    if "beatport.com" in text.lower() or "traxsource.com" in text.lower():
+        # Extract from streaming platform URLs
+        # These usually contain artist-title in the path
+        parts = text.split('/')
+        for part in parts:
+            if '-' in part and len(part) > 10:
+                # Likely artist-title part
+                cleaned = part.replace('-', ' ').replace('_', ' ')
+                return parse_music_data(cleaned)  # Recursive call
+        return result
+    
+    # Multi-line parsing (each line is treated separately)
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    if len(lines) > 1:
+        # Multi-track scenario
+        tracks = []
+        for line in lines:
+            parsed = parse_music_data(line)
+            if parsed.get("title"):
+                tracks.append(parsed["title"])
+        if tracks:
+            result["tracks"] = "; ".join(tracks)
+            # Use first line for other metadata
+            first_parsed = parse_music_data(lines[0])
+            result.update({k: v for k, v in first_parsed.items() if k != "title"})
+        return result
+    
+    # Single line parsing patterns
+    text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+    
+    # Pattern 1: "Artist - Title" or "Artist - Album - Title" (support various dash types)
+    # Support multiple dash types: - – — (hyphen, en-dash, em-dash)
+    dash_pattern = r'\s*[-–—]\s*'
+    if re.search(dash_pattern, text):
+        parts = [p.strip() for p in re.split(dash_pattern, text)]
+        if len(parts) == 2:
+            result["artist"] = parts[0]
+            result["title"] = parts[1]
+        elif len(parts) == 3:
+            result["artist"] = parts[0]
+            result["album"] = parts[1] 
+            result["title"] = parts[2]
+        elif len(parts) > 3:
+            # Assume first is artist, last is title, middle parts are album
+            result["artist"] = parts[0]
+            result["title"] = parts[-1]
+            result["album"] = " - ".join(parts[1:-1])
+    
+    # Pattern 2: "Title by Artist"
+    elif ' by ' in text.lower():
+        parts = re.split(r'\s+by\s+', text, flags=re.IGNORECASE)
+        if len(parts) == 2:
+            result["title"] = parts[0].strip()
+            result["artist"] = parts[1].strip()
+    
+    # Pattern 3: "Artist: Title" or "Artist : Title"
+    elif ':' in text:
+        parts = [p.strip() for p in text.split(':', 1)]
+        if len(parts) == 2:
+            result["artist"] = parts[0]
+            result["title"] = parts[1]
+    
+    # Pattern 4: Featuring/Collaboration formats
+    # Handle "feat", "ft", "featuring", "&", "vs", "x" collaborations
+    elif any(collab in text.lower() for collab in [' feat ', ' ft ', ' featuring ', ' & ', ' vs ', ' x ']):
+        # Extract main artist and collaboration info
+        collab_patterns = [
+            (r'\s+(feat\.?|ft\.?|featuring)\s+(.+)', 'feat'),
+            (r'\s+&\s+(.+)', 'collab'),
+            (r'\s+(vs\.?|versus)\s+(.+)', 'vs'),
+            (r'\s+x\s+(.+)', 'collab')
+        ]
+        
+        for pattern, collab_type in collab_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                main_part = text[:match.start()].strip()
+                collab_part = match.group(-1).strip()  # Last group
+                
+                # Try to parse main part as "Artist - Title"
+                if re.search(dash_pattern, main_part):
+                    main_parsed = [p.strip() for p in re.split(dash_pattern, main_part)]
+                    if len(main_parsed) == 2:
+                        result["artist"] = f"{main_parsed[0]} feat. {collab_part}" if collab_type == 'feat' else f"{main_parsed[0]} & {collab_part}"
+                        result["title"] = main_parsed[1]
+                        break
+                else:
+                    # Assume whole main part is artist
+                    result["artist"] = f"{main_part} feat. {collab_part}" if collab_type == 'feat' else f"{main_part} & {collab_part}"
+                    break
+    
+    # Pattern 4: Catalog number detection (letters/numbers pattern with brackets)
+    catno_match = re.search(r'[\[\(]?([A-Z]{2,6}[\-\s]?\d{2,6})[\]\)]?', text)
+    if catno_match:
+        result["catalog_number"] = catno_match.group(1)  # Group 1 = without brackets
+        # Remove entire catalog number including brackets from text and reparse
+        remaining_text = text.replace(catno_match.group(0), '').strip()
+        if remaining_text:
+            remaining_parsed = parse_music_data(remaining_text)
+            result.update(remaining_parsed)
+    
+    # Pattern 5: Year detection (4 digits)
+    year_match = re.search(r'\b(19|20)\d{2}\b', text)
+    if year_match:
+        result["year"] = year_match.group(0)
+    
+    # Pattern 6: Mix version detection and cleanup
+    # Clean up common mix suffixes from title if already parsed
+    if result.get("title"):
+        title = result["title"]
+        # Remove common mix indicators that platforms auto-add
+        mix_patterns = [
+            r'\s*\(Original Mix\)$',
+            r'\s*\(Radio Edit\)$', 
+            r'\s*\(Extended Mix\)$',
+            r'\s*\(Instrumental\)$',
+            r'\s*\(Dub Mix\)$',
+            r'\s*\(Club Mix\)$',
+            r'\s*\(Original\)$'
+        ]
+        
+        for pattern in mix_patterns:
+            title = re.sub(pattern, '', title, flags=re.IGNORECASE)
+        
+        result["title"] = title.strip()
+    
+    # Pattern 7: Handle parentheses and brackets content
+    # Extract remix info, year, or other metadata in parentheses
+    if result.get("title"):
+        title = result["title"]
+        
+        # Look for remix info in parentheses
+        remix_match = re.search(r'\(([^)]*(?:remix|mix|edit|version|rework)[^)]*)\)', title, re.IGNORECASE)
+        if remix_match:
+            remix_info = remix_match.group(1)
+            # Keep meaningful remix info, remove generic ones
+            if not any(generic in remix_info.lower() for generic in ['original mix', 'radio edit', 'original']):
+                # Keep the remix info as part of title for now
+                pass
+            else:
+                # Remove generic remix info
+                title = title.replace(remix_match.group(0), '').strip()
+                result["title"] = title
+    
+    # Pattern 8: Handle quotation marks around titles
+    if result.get("title"):
+        title = result["title"]
+        # Remove surrounding quotes if present
+        if (title.startswith('"') and title.endswith('"')) or (title.startswith("'") and title.endswith("'")):
+            result["title"] = title[1:-1].strip()
+    
+    # Fallback strategies for cases where no separators are found
+    if not result and text:
+        # Try to guess Artist - Title structure from word patterns
+        fallback_result = guess_artist_title_fallback(text)
+        if fallback_result:
+            result.update(fallback_result)
+        else:
+            # Last resort: assume it's a title
+            result["title"] = text
+    
+    return result
+
+def guess_artist_title_fallback(text):
+    """
+    Fallback function to guess artist/title when no clear separators are found
+    Uses heuristics based on common patterns
+    """
+    import re
+    
+    words = text.split()
+    if len(words) < 2:
+        return {"title": text}
+    
+    # Strategy 1: Look for title case patterns
+    # Often artists are in title case, titles may have mixed case
+    title_case_words = []
+    other_words = []
+    
+    for i, word in enumerate(words):
+        if word[0].isupper() and len(word) > 1 and word[1:].islower():
+            title_case_words.append((i, word))
+        else:
+            other_words.append((i, word))
+    
+    # Strategy 2: Look for common artist name patterns
+    # Two consecutive title case words often indicate artist name
+    if len(title_case_words) >= 2:
+        # Check if first few words are title case (likely artist)
+        consecutive_title_case = 0
+        for i, (pos, word) in enumerate(title_case_words):
+            if pos == i:
+                consecutive_title_case += 1
+            else:
+                break
+        
+        if consecutive_title_case >= 2 and consecutive_title_case < len(words):
+            # Split at the end of consecutive title case words
+            artist_words = words[:consecutive_title_case]
+            title_words = words[consecutive_title_case:]
+            
+            return {
+                "artist": " ".join(artist_words),
+                "title": " ".join(title_words)
+            }
+    
+    # Strategy 3: Look for common title indicators
+    title_indicators = [
+        r'\b(remix|mix|edit|version|rework|bootleg)\b',
+        r'\b(love|night|day|time|life|world|heart|soul)\b',
+        r'\b(the|a|an)\s+\w+',  # Articles often appear in titles
+    ]
+    
+    for i, word in enumerate(words):
+        for pattern in title_indicators:
+            if re.search(pattern, word, re.IGNORECASE):
+                # Split before this word (likely start of title)
+                if i > 0:
+                    return {
+                        "artist": " ".join(words[:i]),
+                        "title": " ".join(words[i:])
+                    }
+    
+    # Strategy 4: Split at halfway point if text is long enough
+    if len(words) >= 4:
+        mid_point = len(words) // 2
+        return {
+            "artist": " ".join(words[:mid_point]),
+            "title": " ".join(words[mid_point:])
+        }
+    
+    # Strategy 5: Assume first word is artist if it's a proper noun
+    if len(words) >= 2 and words[0][0].isupper():
+        return {
+            "artist": words[0],
+            "title": " ".join(words[1:])
+        }
+    
+    # Give up and return as title
+    return {"title": text}
+
 discogs_provider = DiscogsProvider()
 revibed_provider = RevibedProvider()
 
@@ -111,17 +457,85 @@ container_key = f"containers_{st.session_state.get('container_generation', 0)}"
 live_placeholder      = st.empty()
 secondary_placeholder = st.empty()
 
-# --- Mode-Auswahl + Reset (optional) ---
-col_mode, col_reset = st.columns([5,1])
-with col_mode:
-    mode = st.radio("Choose Input Mode:", 
-                    ("Manual Input","Take a picture","Upload photo"),
-                    key="input_mode")
-with col_reset:
-    if st.button("Reset"):
-        # Simple page reload - clear all session state
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+# --- Mode-Auswahl ---
+mode = st.radio("Choose Input Mode:", 
+                ("Manual Input","Take a picture","Upload photo"),
+                key="input_mode")
+
+# --- Paste and Reset Buttons (very compact) ---
+col_buttons, col_spacer = st.columns([1, 3])
+
+with col_buttons:
+    # Check if paste was already used in this session
+    paste_already_used = st.session_state.get("paste_used", False)
+    
+    # Put both buttons in the same narrow column with minimal spacing
+    subcol1, subcol2 = st.columns([1, 1])
+    
+    with subcol1:
+        if not paste_already_used:
+            if st.button("Paste", key="paste_button"):
+                # Simple approach - trigger a paste dialog
+                st.session_state.show_paste_dialog = True
+                st.rerun()
+        else:
+            st.button("Paste", key="paste_button_disabled", disabled=True, help="Paste already used. Use Reset to enable again.")
+    
+    with subcol2:
+        reset_clicked = st.button("Reset", key="reset_button")
+
+# Handle reset outside of columns to avoid layout issues
+if reset_clicked:
+    # Complete page reload - clear everything and start fresh
+    import streamlit.components.v1 as components
+    components.html("""
+    <script>
+    window.parent.location.reload();
+    </script>
+    """, height=0)
+
+# Show simple paste dialog when triggered
+if st.session_state.get("show_paste_dialog", False):
+    # Use st_keyup for immediate processing
+    paste_content = st_keyup(
+        "Paste here (Ctrl+V):",
+        key="paste_input_field",
+        placeholder="Paste your music data here...",
+        debounce=300
+    )
+    
+    # Auto-process when content is entered
+    if paste_content and paste_content.strip():
+        parsed = parse_music_data(paste_content)
+        
+        # Apply parsed data directly to session state
+        if parsed.get("tracks"):
+            st.session_state.tracks_input = parsed["tracks"]
+        elif parsed.get("title"):
+            st.session_state.tracks_input = parsed["title"]
+        
+        if parsed.get("artist"):
+            st.session_state.artist_input = parsed["artist"]
+        if parsed.get("album"):
+            st.session_state.album_input = parsed["album"]
+        if parsed.get("catalog_number"):
+            st.session_state.catalog_number_input = parsed["catalog_number"]
+        
+        # Mark paste as used and close dialog
+        st.session_state.paste_used = True
+        st.session_state.show_paste_dialog = False
+        
+        # Force input field refresh by incrementing reset counter
+        if "reset_counter" not in st.session_state:
+            st.session_state.reset_counter = 0
+        st.session_state.reset_counter += 1
+        
+        st.success(f"✅ Pasted and parsed: {len([k for k in parsed.keys() if parsed[k]])} fields filled!")
+        st.rerun()
+    
+    # Cancel option
+    if st.button("Cancel", key="cancel_paste_dialog"):
+        st.session_state.show_paste_dialog = False
         st.rerun()
 
 if mode != st.session_state.last_mode:
@@ -203,7 +617,7 @@ def create_input_fields(reset_suffix=""):
         tracks_input = st_keyup(
             "Track(s) - separate multiple tracks with semicolon", 
             value=st.session_state.get("tracks_input", ""),
-            debounce=300,  # Wait 300ms before triggering update - prevents constant reruns
+            debounce=100,  # Quick response for button updates
             key=f"tracks_keyup{reset_suffix}"
         )
         st.caption("Enter one or more track titles separated by semicolon (;)")
@@ -213,7 +627,7 @@ def create_input_fields(reset_suffix=""):
         artist_input = st_keyup(
             "Artist", 
             value=st.session_state.get("artist_input", ""),
-            debounce=300,  # Wait 300ms before triggering update
+            debounce=100,  # Quick response for button updates
             key=f"artist_keyup{reset_suffix}"
         )
         if artist_input != st.session_state.get("artist_input", ""):
@@ -222,7 +636,7 @@ def create_input_fields(reset_suffix=""):
         catalog_input = st_keyup(
             "Catalog Number", 
             value=st.session_state.get("catalog_number_input", ""),
-            debounce=300,  # Wait 300ms before triggering update
+            debounce=100,  # Quick response for button updates
             key=f"catalog_keyup{reset_suffix}"
         )
         if catalog_input != st.session_state.get("catalog_number_input", ""):
@@ -231,7 +645,7 @@ def create_input_fields(reset_suffix=""):
         album_input = st_keyup(
             "Album", 
             value=st.session_state.get("album_input", ""),
-            debounce=300,  # Wait 300ms before triggering update
+            debounce=100,  # Quick response for button updates
             key=f"album_keyup{reset_suffix}"
         )
         if album_input != st.session_state.get("album_input", ""):

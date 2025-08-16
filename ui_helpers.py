@@ -960,12 +960,8 @@ def show_discogs_block(releases, track_for_search, is_real_gem=False):
                 url         = r.get("uri") or r.get("url") or ""
                 community   = r.get("community", "-")
 
-                # Display detailed info
-                st.markdown(f"**{title_str}**")
-                st.markdown(f"**Label:** `{label_str}`")
-                st.markdown(f"**Jahr:** {year_str}")
-                st.markdown(f"**Format:** {format_str}")
-                st.markdown(f"**Katalog:** `{catno_str}`")
+                # Display detailed info with consistent compact spacing
+                st.markdown(f"**{title_str}**  \n**Label:** `{label_str}`  \n**Jahr:** {year_str}  \n**Format:** {format_str}  \n**Katalog:** `{catno_str}`")
                 
                 # Have/Want ratio - get from API details with caching
                 release_id = r.get("id")
@@ -994,18 +990,23 @@ def show_discogs_block(releases, track_for_search, is_real_gem=False):
                                 
                 have_color = get_intensity_color(have_count, "green")
                 want_color = get_intensity_color(want_count, "red")
-                st.markdown(f"**Have/Want:** {have_color}/{want_color}")
                 
-                # Original search info
+                # Compact display with consistent line spacing
+                search_info = []
+                search_info.append(f"**Have/Want:** {have_color}/{want_color}")
+                
                 if st.session_state.artist_input:
-                    st.markdown(f"**Artist:** {st.session_state.artist_input}")
+                    search_info.append(f"**Artist:** {st.session_state.artist_input}")
                 if st.session_state.album_input:
-                    st.markdown(f"**Album:** {st.session_state.album_input}")
+                    search_info.append(f"**Album:** {st.session_state.album_input}")
                 if track_for_search:
-                    st.markdown(f"**Track:** {track_for_search}")
+                    search_info.append(f"**Track:** {track_for_search}")
                 
                 if url:
-                    st.markdown(f"[Discogs Release →](https://www.discogs.com{url})")
+                    search_info.append(f"[Discogs Release →](https://www.discogs.com{url})")
+                
+                # Display all search info with compact spacing like metadata
+                st.markdown("  \n".join(search_info))
 
         # Show offers in right column using fragment for auto-update
         with offers_col:
@@ -1039,7 +1040,7 @@ def show_discogs_block(releases, track_for_search, is_real_gem=False):
             
             with release_col:
                 if full_tracklist:
-                    st.markdown("**Tracklist:**")
+                    st.markdown("## **Tracklist**")
                     tracklist_text = ""
                     for t in full_tracklist:
                         if isinstance(t, dict):
@@ -1098,6 +1099,36 @@ def show_discogs_block(releases, track_for_search, is_real_gem=False):
                             tracklist_text += f"{track_line}  \n"
                     
                     st.markdown(tracklist_text)
+                
+                # Show video samples if available
+                release_id = r.get("id")
+                videos = []
+                if release_id:
+                    cache_key = f"release_details_{release_id}"
+                    if cache_key in st.session_state:
+                        details = st.session_state[cache_key]
+                        videos = details.get("videos", [])
+                
+                if videos:
+                    st.markdown("## **Video Samples**")
+                    
+                    # Collect all video links with compact spacing
+                    video_links = []
+                    for video in videos:
+                        video_url = video.get("uri", "")
+                        video_title = video.get("title", "Sample")
+                        video_duration = video.get("duration", 0)
+                        
+                        if video_url:
+                            # Format duration if available
+                            duration_str = f" ({video_duration}s)" if video_duration > 0 else ""
+                            
+                            # Create clickable link without emoji
+                            video_links.append(f"[{video_title}{duration_str}]({video_url})")
+                    
+                    # Display all video links with compact spacing like metadata
+                    if video_links:
+                        st.markdown("  \n".join(video_links))
                 
                 # Move search button below tracklist - back to simple working keys
                 search_button_key = f"search_offers_btn_{selected_idx}"

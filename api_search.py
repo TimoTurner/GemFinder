@@ -365,10 +365,22 @@ def get_discogs_release_details(release_id):
                     "duration": track.get("duration", "")
                 })
             
+            # Extract video samples (YouTube/Vimeo links from Discogs release page)
+            videos = []
+            for video in data.get("videos", []):
+                videos.append({
+                    "uri": video.get("uri", ""),
+                    "title": video.get("title", ""),
+                    "description": video.get("description", ""),
+                    "duration": video.get("duration", 0),
+                    "embed": video.get("embed", True)
+                })
+            
             return {
                 "id": str(data.get("id", release_id)),
                 "title": data.get("title", ""),
                 "tracklist": tracklist,
+                "videos": videos,  # Add video samples
                 "label": data.get("labels", [{"name": "Unknown"}])[0].get("name", "Unknown") if data.get("labels") else ["Unknown"],
                 "year": data.get("year", ""),
                 "format": [f.get("name", "") for f in data.get("formats", [])],
@@ -386,6 +398,7 @@ def get_discogs_release_details(release_id):
         "id": release_id,
         "title": f"Release {release_id}",
         "tracklist": [],
+        "videos": [],  # Add empty videos array
         "label": ["Unknown"],
         "year": "",
         "format": ["Unknown"],

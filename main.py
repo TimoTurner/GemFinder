@@ -119,27 +119,9 @@ with col_mode:
                     key="input_mode")
 with col_reset:
     if st.button("Reset"):
-        # Reset input fields and clear keyup component states
-        app_state.reset_search()
-        st.session_state.last_mode = mode
-        
-        # Force keyup components to reset by clearing their values AND keys
-        st.session_state.tracks_input = ""
-        st.session_state.artist_input = ""
-        st.session_state.catalog_number_input = ""
-        st.session_state.album_input = ""
-        
-        # Clear the keyup component keys to force them to reset
-        keyup_keys = ["tracks_keyup", "artist_keyup", "catalog_keyup", "album_keyup", "track_select"]
-        for key in keyup_keys:
-            if key in st.session_state:
-                del st.session_state[key]
-        
-        # Increment reset counter to force component recreation with new keys
-        if "reset_counter" not in st.session_state:
-            st.session_state.reset_counter = 0
-        st.session_state.reset_counter += 1
-        
+        # Simple page reload - clear all session state
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
         st.rerun()
 
 if mode != st.session_state.last_mode:
@@ -179,38 +161,81 @@ if mode != st.session_state.last_mode:
 # --- Helper function to create input fields ---
 def create_input_fields(reset_suffix=""):
     """Create the standard input fields used across all modes"""
-    tracks_input = st_keyup(
-        "Track(s) - separate multiple tracks with semicolon", 
-        value=st.session_state.get("tracks_input", ""),
-        key=f"tracks_keyup{reset_suffix}"
-    )
-    st.caption("Enter one or more track titles separated by semicolon (;)")
-    if tracks_input != st.session_state.get("tracks_input", ""):
-        st.session_state.tracks_input = tracks_input
+    # Use SAME logic as button: disable inputs when search started OR cache valid
+    search_started = st.session_state.get("suche_gestartet", False)
+    cache_valid = AppState().is_cache_valid() if search_started else False
+    inputs_disabled = search_started and cache_valid
+    
+    print(f"🔍 DEBUG: search_started={search_started}, cache_valid={cache_valid}, inputs_disabled={inputs_disabled}")
+    
+    if inputs_disabled:
+        # Show disabled text inputs when search is active
+        st.text_input(
+            "Track(s) - separate multiple tracks with semicolon", 
+            value=st.session_state.get("tracks_input", ""),
+            disabled=True,
+            key=f"tracks_disabled{reset_suffix}"
+        )
+        st.caption("🔒 Inputs locked - use Reset button to modify search criteria")
+        
+        st.text_input(
+            "Artist", 
+            value=st.session_state.get("artist_input", ""),
+            disabled=True,
+            key=f"artist_disabled{reset_suffix}"
+        )
+        
+        st.text_input(
+            "Catalog Number", 
+            value=st.session_state.get("catalog_number_input", ""),
+            disabled=True,
+            key=f"catalog_disabled{reset_suffix}"
+        )
+        
+        st.text_input(
+            "Album", 
+            value=st.session_state.get("album_input", ""),
+            disabled=True,
+            key=f"album_disabled{reset_suffix}"
+        )
+    else:
+        # Show normal interactive inputs when no search is active
+        tracks_input = st_keyup(
+            "Track(s) - separate multiple tracks with semicolon", 
+            value=st.session_state.get("tracks_input", ""),
+            debounce=300,  # Wait 300ms before triggering update - prevents constant reruns
+            key=f"tracks_keyup{reset_suffix}"
+        )
+        st.caption("Enter one or more track titles separated by semicolon (;)")
+        if tracks_input != st.session_state.get("tracks_input", ""):
+            st.session_state.tracks_input = tracks_input
 
-    artist_input = st_keyup(
-        "Artist", 
-        value=st.session_state.get("artist_input", ""),
-        key=f"artist_keyup{reset_suffix}"
-    )
-    if artist_input != st.session_state.get("artist_input", ""):
-        st.session_state.artist_input = artist_input
+        artist_input = st_keyup(
+            "Artist", 
+            value=st.session_state.get("artist_input", ""),
+            debounce=300,  # Wait 300ms before triggering update
+            key=f"artist_keyup{reset_suffix}"
+        )
+        if artist_input != st.session_state.get("artist_input", ""):
+            st.session_state.artist_input = artist_input
 
-    catalog_input = st_keyup(
-        "Catalog Number", 
-        value=st.session_state.get("catalog_number_input", ""),
-        key=f"catalog_keyup{reset_suffix}"
-    )
-    if catalog_input != st.session_state.get("catalog_number_input", ""):
-        st.session_state.catalog_number_input = catalog_input
+        catalog_input = st_keyup(
+            "Catalog Number", 
+            value=st.session_state.get("catalog_number_input", ""),
+            debounce=300,  # Wait 300ms before triggering update
+            key=f"catalog_keyup{reset_suffix}"
+        )
+        if catalog_input != st.session_state.get("catalog_number_input", ""):
+            st.session_state.catalog_number_input = catalog_input
 
-    album_input = st_keyup(
-        "Album", 
-        value=st.session_state.get("album_input", ""),
-        key=f"album_keyup{reset_suffix}"
-    )
-    if album_input != st.session_state.get("album_input", ""):
-        st.session_state.album_input = album_input
+        album_input = st_keyup(
+            "Album", 
+            value=st.session_state.get("album_input", ""),
+            debounce=300,  # Wait 300ms before triggering update
+            key=f"album_keyup{reset_suffix}"
+        )
+        if album_input != st.session_state.get("album_input", ""):
+            st.session_state.album_input = album_input
 
 # --- Helper function to check if button should be enabled ---
 def check_button_state():
@@ -436,7 +461,17 @@ can_search_secondary = any(p.can_search(criteria) for p in secondary_providers)
 can_search = can_search_digital or can_search_secondary
 
 # Proactive reset: If search was done but cache is now invalid, reset immediately
-if st.session_state.get("suche_gestartet", False) and not app_state.is_cache_valid():
+# BUT: Don't reset if search is completed (inputs are disabled) - preserve results!
+search_started = st.session_state.get("suche_gestartet", False)
+digital_search_done = st.session_state.get("digital_search_done", False)
+cache_valid = app_state.is_cache_valid()
+search_completed = search_started and digital_search_done and cache_valid
+
+print(f"🔍 RESET DEBUG: search_started={search_started}, digital_done={digital_search_done}, cache_valid={cache_valid}, search_completed={search_completed}")
+
+if search_started and not cache_valid and not search_completed:
+    
+    print(f"🔄 DEBUG: Proactive reset triggered - search not completed yet")
     # Explicitly invalidate cache
     app_state.invalidate_cache()
     
@@ -450,6 +485,9 @@ if st.session_state.get("suche_gestartet", False) and not app_state.is_cache_val
     st.session_state.results_digital = []
     st.session_state.results_discogs = []
     st.session_state.results_revibed = []
+else:
+    if search_completed:
+        print(f"🔒 DEBUG: Search completed - preserving results despite cache invalidation")
 
 # Show which platforms will be searched - use placeholder that can be cleared later
 search_info_placeholder = st.empty()
@@ -485,6 +523,14 @@ else:
     search_clicked = False
 
 if search_clicked or track_search_clicked:
+    # IMMEDIATELY set search state to disable inputs AND start search
+    print(f"🔘 DEBUG: Button clicked! Setting suche_gestartet = True and starting search")
+    st.session_state.suche_gestartet = True
+    
+    # Clear the flag for next search
+    if "inputs_disabled_rerun_done" in st.session_state:
+        del st.session_state.inputs_disabled_rerun_done
+    
     # Force cache invalidation when track search button is clicked
     if track_search_clicked:
         app_state.invalidate_cache()
@@ -495,7 +541,6 @@ if search_clicked or track_search_clicked:
         app_state.invalidate_cache()
         
         # Set search state
-        st.session_state.suche_gestartet = True
         st.session_state.track_for_search = st.session_state.selected_track
         # Clear the search info and button placeholders
         if hasattr(st.session_state, 'search_info_placeholder'):
@@ -848,7 +893,8 @@ if st.session_state.get("trigger_secondary_search", False) and can_search_second
     # Results are already displayed individually as they complete
 
 # Display cached results if search already done and cache is valid
-elif st.session_state.suche_gestartet and app_state.is_cache_valid():
+# Changed from elif to if to always show cached results
+if st.session_state.suche_gestartet and app_state.is_cache_valid():
     # Don't show digital results if we're in secondary mode
     if st.session_state.show_digital and st.session_state.digital_search_done and not st.session_state.get("discogs_revibed_mode", False):
         # Show cached digital results via live container

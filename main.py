@@ -1000,16 +1000,19 @@ if search_clicked or track_search_clicked:
                     if thread_result["status"] == "success":
                         entry = thread_result["result"]
                     else:
+                        # Use structured error message instead of generic "Fehler"
+                        error_msg = thread_result.get("error", "Unknown error")
+                        error_title = f"🔧 {thread_result['provider']} Error: {str(error_msg)[:40]}..."
                         entry = {
                             "platform": thread_result["provider"],
-                            "title": "Fehler",
+                            "title": error_title,
                             "artist": "",
                             "album": "",
                             "label": "",
                             "price": "",
                             "cover_url": "",
                             "url": "",
-                            "error": thread_result["error"]
+                            "error": error_msg
                         }
                     
                     # SOFORT anzeigen sobald Thread fertig
@@ -1022,11 +1025,28 @@ if search_clicked or track_search_clicked:
             # Mark digital search as done
             st.session_state.digital_search_done = True
             
-            # Check for real hits
-            real_hits = [
-                r for r in st.session_state.results_digital
-                if (r.get("title") or "").strip().lower() not in ("kein treffer", "", "fehler")
-            ]
+            # Check for real hits - updated to recognize new error handling messages
+            real_hits = []
+            for r in st.session_state.results_digital:
+                title = (r.get("title") or "").strip().lower()
+                # Old error patterns
+                old_patterns = ("kein treffer", "", "fehler")
+                # New structured error patterns from error handling system
+                new_error_patterns = (
+                    "❌", "🔴", "🔧", "📭", "🚫", "🐌", "⚡", "🔒", 
+                    "not reachable", "nicht verfügbar", "not available",
+                    "initialization failed", "browser error", "timeout",
+                    "no search terms", "keine suchbegriffe"
+                )
+                
+                # Check if this is a real hit (not an error message)
+                is_error = (
+                    title in old_patterns or 
+                    any(pattern in title for pattern in new_error_patterns)
+                )
+                
+                if not is_error:
+                    real_hits.append(r)
 
             
             st.session_state.has_digital_hits = len(real_hits) > 0

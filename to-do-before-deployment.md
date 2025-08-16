@@ -1,10 +1,6 @@
 # To-Do Before Deployment
 
 > **Checkliste für die Produktionsreife - Erst ausführen wenn Funktionsumfang vollständig**
-
-reset Button
-paste input 
-(yt discogs)
 ---
 
 ## 🎵 FEATURE IMPROVEMENTS
@@ -13,13 +9,7 @@ paste input
 ```
 Prompt: "Implementiere plattform-spezifische Verbesserungen:
 
-1. **Bandcamp Track-Preis Priorität**:
-   - Erkenne Track-Preis vs Album-Preis
-   - Bevorzuge Individual Track-Pricing wenn verfügbar
-   - Fallback auf Album-Preis nur wenn kein Track-Preis existiert
-   - Verbessere CSS-Selektoren für Track-spezifische Preise
-
-2. **iTunes Content-Type Priorität**:
+1. **iTunes Content-Type Priorität**:
    - Bevorzuge Tracks > Podcasts > Mixes in Search Results
    - Filtere basierend auf 'kind' oder 'wrapperType' in API Response
    - Implementiere Content-Type Scoring System
@@ -27,31 +17,6 @@ Prompt: "Implementiere plattform-spezifische Verbesserungen:
 
 Teste mit verschiedenen Search-Szenarien um optimale Ergebnis-Qualität sicherzustellen."
 ```
-
-### **Performance Optimizations**
-```
-Prompt: "Optimiere Bandcamp Scraper Performance:
-
-1. **Timeout Definierung**:
-   - Implementiere spezifische Timeout-Werte für Bandcamp
-   - Reduziere Wartezeiten auf notwendiges Minimum
-   - Optimiere WebDriverWait-Strategien
-
-2. **Titel Output Korrektur**:
-   - Verbessere Titel-Extraktion für genauere Ergebnisse
-   - Stelle sicher dass der korrekte Track-Titel extrahiert wird
-   - Entferne unnötige Zusätze oder Formatierungen
-
-3. **Speed Improvements**:
-   - Reduziere DOM-Loading Zeit
-   - Optimiere Element-Selektor-Strategien
-   - Implementiere schnellere Fallback-Mechanismen
-
-Ziel: Bandcamp Scraper-Zeit um mindestens 50% reduzieren bei gleichbleibender Genauigkeit."
-```
-
----
-
 ## 🔒 SCRAPER ROBUSTNESS
 
 ### **Intelligente Element-Erkennung**

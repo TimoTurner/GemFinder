@@ -1,6 +1,7 @@
 # import requests
 # from bs4 import BeautifulSoup
 # import json
+from error_types import ErrorType, create_error, log_error
 
 
 # def digital_releases(track, artist)):
@@ -231,14 +232,42 @@ def flexible_search_match(artist, track, title, artist_found, additional_text=""
 
 # --- BEATPORT DUMMY ---
 def search_beatport(artist, track, album=""):
-    """Beatport scraper with test dummy and fallback error handling"""
+    """Beatport scraper with comprehensive error handling"""
+    import time
+    platform = "Beatport"
+    start_time = time.time()
+    
     try:
-        # Real Beatport scraper implementation
-        from selenium import webdriver
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        import time
+        # Input validation
+        if not artist and not track and not album:
+            error = create_error(
+                ErrorType.VALIDATION_ERROR,
+                platform,
+                "No search parameters provided",
+                artist=artist,
+                track=track,
+                album=album
+            )
+            log_error(error)
+            return _beatport_error_result("❌ No search terms provided")
+        
+        # Dependency check
+        try:
+            from selenium import webdriver
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            import time
+        except ImportError as e:
+            error = create_error(
+                ErrorType.DEPENDENCY_ERROR,
+                platform,
+                "Selenium dependencies not available",
+                package="selenium",
+                original_error=str(e)
+            )
+            log_error(error)
+            return _beatport_error_result("🔧 Browser automation not available")
         
         # Build search query based on available parameters
         search_terms = []
@@ -287,38 +316,151 @@ def search_beatport(artist, track, album=""):
             "profile.default_content_setting_values.media_stream": 2,
         })
         
-        driver = webdriver.Chrome(options=options)
+        try:
+            driver = webdriver.Chrome(options=options)
+        except Exception as e:
+            error = create_error(
+                ErrorType.BROWSER_ERROR,
+                platform,
+                "Failed to initialize Chrome WebDriver",
+                original_error=str(e)
+            )
+            log_error(error)
+            return [_beatport_error_result("🌐 Browser initialization failed")]
         
-        # ULTIMATE SPEED PUSH for <4s target 
-        driver.implicitly_wait(0.6)                  # 0.8s → 0.6s 
-        driver.set_page_load_timeout(2.2)            # 2.5s → 2.2s
-        wait = WebDriverWait(driver, 1.2)            # 1.5s → 1.2s
-        
-        driver.get(url)
+        try:
+            # ULTIMATE SPEED PUSH for <4s target 
+            driver.implicitly_wait(0.6)                  # 0.8s → 0.6s 
+            driver.set_page_load_timeout(2.2)            # 2.5s → 2.2s
+            wait = WebDriverWait(driver, 1.2)            # 1.5s → 1.2s
+            
+            driver.get(url)
+            
+        except Exception as e:
+            try:
+                driver.quit()
+            except:
+                pass
+            
+            # Smart timeout handling - distinguish between real failures and slow loading
+            error_message = str(e).lower()
+            if "timeout" in error_message:
+                # Try one quick retry with slightly longer timeout for slow connections
+                print(f"⚡ Beatport: Quick retry with extended timeout...")
+                try:
+                    driver.set_page_load_timeout(4.0)  # One-time extension
+                    driver.get(url)
+                    print(f"✅ Beatport: Retry successful!")
+                    # Continue with normal flow - don't return error
+                except Exception as retry_error:
+                    # Real timeout issue
+                    error = create_error(
+                        ErrorType.SCRIPT_TIMEOUT,
+                        platform,
+                        f"Page load timeout for Beatport after retry: {url}",
+                        timeout_duration=4.0,
+                        retry_attempted=True,
+                        url=url,
+                        original_error=str(retry_error)
+                    )
+                    log_error(error)
+                    return [_beatport_error_result("🔴 Beatport not reachable")]
+            elif "network" in error_message or "dns" in error_message:
+                error = create_error(
+                    ErrorType.SITE_DOWN,
+                    platform,
+                    "Cannot reach Beatport website",
+                    url=url,
+                    original_error=str(e)
+                )
+            else:
+                error = create_error(
+                    ErrorType.BROWSER_ERROR,
+                    platform,
+                    f"Browser error accessing Beatport: {str(e)}",
+                    url=url,
+                    original_error=str(e)
+                )
+            
+            log_error(error)
+            return [_beatport_error_result("🔴 Beatport not reachable")]
         
         # SKIP cookie banner - waste of time for scraping
         # Cookie acceptance not needed for search results
         
-        # DEBUG: Detailed result detection
+        # Element detection with structured error handling
+        rows = []
         try:
             print(f"🔍 Beatport: Waiting for tracks with 1.2s timeout...")
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div[data-testid="tracks-list-item"]')))
             rows = driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="tracks-list-item"]')
             print(f"✅ Beatport: Found {len(rows)} tracks with primary selector")
-        except Exception as e:
-            print(f"❌ Beatport: Primary selector timed out: {e}")
-            # Check if page actually loaded
-            page_source = driver.page_source
-            print(f"📄 Beatport: Page source length: {len(page_source)} chars")
-            print(f"🔍 Beatport: Page title: '{driver.title}'")
             
-            # Fast fallback - only one alternative
+        except Exception as e:
+            print(f"❌ Beatport: Primary selector timed out: {str(e)}")
+            
+            # Check if page loaded properly
             try:
-                rows = driver.find_elements(By.CSS_SELECTOR, 'div[class*="track"]')
-                print(f"🔄 Beatport: Fallback found {len(rows)} elements")
-            except Exception as e2:
-                print(f"❌ Beatport: Fallback also failed: {e2}")
-                rows = []
+                page_source = driver.page_source
+                page_title = driver.title
+                print(f"📄 Beatport: Page source length: {len(page_source)} chars")
+                print(f"🔍 Beatport: Page title: '{page_title}'")
+                
+                # Determine if this is a site issue or structure change
+                if len(page_source) < 1000:
+                    error = create_error(
+                        ErrorType.SITE_DOWN,
+                        platform,
+                        "Beatport page failed to load properly",
+                        page_size=len(page_source),
+                        page_title=page_title
+                    )
+                    log_error(error)
+                    try:
+                        driver.quit()
+                    except:
+                        pass
+                    return [_beatport_error_result("🔴 Beatport not responding")]
+                
+                # Try fallback selector
+                try:
+                    rows = driver.find_elements(By.CSS_SELECTOR, 'div[class*="track"]')
+                    print(f"🔄 Beatport: Fallback found {len(rows)} elements")
+                    if not rows:
+                        # Structure may have changed
+                        error = create_error(
+                            ErrorType.STRUCTURE_CHANGED,
+                            platform,
+                            "Beatport track selectors not found - site structure may have changed",
+                            primary_selector='div[data-testid="tracks-list-item"]',
+                            fallback_selector='div[class*="track"]',
+                            page_title=page_title
+                        )
+                        log_error(error)
+                except Exception as e2:
+                    error = create_error(
+                        ErrorType.SELECTOR_NOT_FOUND,
+                        platform,
+                        "All Beatport selectors failed",
+                        primary_error=str(e),
+                        fallback_error=str(e2)
+                    )
+                    log_error(error)
+                    rows = []
+                    
+            except Exception as page_error:
+                error = create_error(
+                    ErrorType.BROWSER_ERROR,
+                    platform,
+                    f"Cannot access Beatport page content: {str(page_error)}",
+                    original_error=str(page_error)
+                )
+                log_error(error)
+                try:
+                    driver.quit()
+                except:
+                    pass
+                return [_beatport_error_result("🌐 Browser error")]
         
         if not rows:
             print(f"⚠️ Beatport: No rows found, analyzing page...")
@@ -527,20 +669,48 @@ def search_beatport(artist, track, album=""):
                 'search_time': 0.1
             }]
     
+    except ImportError:
+        # Test dummy for development when Selenium not available
+        time.sleep(0.1)
+        if artist.lower() in ["A", "a"] or track.lower() in ["A", "a"]:
+            return [{
+                'platform': 'Beatport',
+                'title': f'TEST: {track}',
+                'artist': f'TEST: {artist}',
+                'album': f'TEST: {album}',
+                'label': 'Test Label',
+                'price': '$1.99',
+                'cover_url': 'https://via.placeholder.com/150x150/0066FF/FFFFFF?text=TEST',
+                'url': f'https://www.beatport.com/track/test/{track.lower()}',
+                'search_time': 0.1
+            }]
+        return [_beatport_error_result("📭 Kein Treffer")]
+        
     except Exception as e:
-        elapsed_time = time.time() - locals().get('start_time', time.time())
-# Performance timing only
-        return [{
-            'platform': 'Beatport',
-            'title': '❌ Beatport Suche nicht verfügbar',
-            'artist': '',
-            'album': '',
-            'label': '',
-            'price': '',
-            'cover_url': '',
-            'url': '',
-            'search_time': elapsed_time
-        }]
+        elapsed_time = time.time() - start_time
+        error = create_error(
+            ErrorType.UNKNOWN_ERROR,
+            platform,
+            f"Unexpected error in Beatport scraper: {str(e)}",
+            elapsed_time=elapsed_time,
+            original_error=str(e)
+        )
+        log_error(error)
+        return [_beatport_error_result("❌ Beatport Suche nicht verfügbar")]
+
+def _beatport_error_result(message: str) -> dict:
+    """Helper function to create consistent Beatport error results"""
+    return {
+        'platform': 'Beatport',
+        'title': message,
+        'artist': '',
+        'album': '',
+        'label': '',
+        'price': '',
+        'cover_url': '',
+        'url': '',
+        'search_time': 0.0
+    }
 
 # --- BANDCAMP DUMMY ---
 def extract_bandcamp_price(driver, item_url):
@@ -635,14 +805,41 @@ def extract_bandcamp_price(driver, item_url):
         return ""  # No fallback price
 
 def search_bandcamp(artist, track):
-    """Bandcamp scraper with test dummy and fallback error handling"""
+    """Bandcamp scraper with comprehensive error handling"""
+    import time
+    platform = "Bandcamp"
+    start_time = time.time()
+    
     try:
-        # Real Bandcamp scraper implementation
-        from selenium import webdriver
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        import time
+        # Input validation
+        if not artist and not track:
+            error = create_error(
+                ErrorType.VALIDATION_ERROR,
+                platform,
+                "No search parameters provided",
+                artist=artist,
+                track=track
+            )
+            log_error(error)
+            return [_bandcamp_error_result("❌ No search terms provided")]
+        
+        # Dependency check
+        try:
+            from selenium import webdriver
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            import time
+        except ImportError as e:
+            error = create_error(
+                ErrorType.DEPENDENCY_ERROR,
+                platform,
+                "Selenium dependencies not available",
+                package="selenium",
+                original_error=str(e)
+            )
+            log_error(error)
+            return [_bandcamp_error_result("🔧 Browser automation not available")]
         
 # Performance timing only
         start_time = time.time()
@@ -669,13 +866,72 @@ def search_bandcamp(artist, track):
             "profile.default_content_settings.popups": 0  # Block popups
         })
         
-        driver = webdriver.Chrome(options=options)
+        try:
+            driver = webdriver.Chrome(options=options)
+        except Exception as e:
+            error = create_error(
+                ErrorType.BROWSER_ERROR,
+                platform,
+                "Failed to initialize Chrome WebDriver for Bandcamp",
+                original_error=str(e)
+            )
+            log_error(error)
+            return [_bandcamp_error_result("🌐 Browser initialization failed")]
         
-        # ULTRA-FAST timeouts for Bandcamp 
-        driver.implicitly_wait(1)                    # 2s → 1s (-50%)
-        driver.set_page_load_timeout(3)              # 4s → 3s (-25%)
-        
-        driver.get(url)
+        try:
+            # ULTRA-FAST timeouts for Bandcamp 
+            driver.implicitly_wait(1)                    # 2s → 1s (-50%)
+            driver.set_page_load_timeout(3)              # 4s → 3s (-25%)
+            
+            driver.get(url)
+            
+        except Exception as e:
+            try:
+                driver.quit()
+            except:
+                pass
+            
+            # Smart timeout handling for Bandcamp
+            error_message = str(e).lower()
+            if "timeout" in error_message:
+                # Try one quick retry with slightly longer timeout
+                print(f"⚡ Bandcamp: Quick retry with extended timeout...")
+                try:
+                    driver.set_page_load_timeout(5.0)  # One-time extension
+                    driver.get(url)
+                    print(f"✅ Bandcamp: Retry successful!")
+                    # Continue with normal flow
+                except Exception as retry_error:
+                    error = create_error(
+                        ErrorType.SCRIPT_TIMEOUT,
+                        platform,
+                        f"Page load timeout for Bandcamp after retry: {url}",
+                        timeout_duration=5.0,
+                        retry_attempted=True,
+                        url=url,
+                        original_error=str(retry_error)
+                    )
+                    log_error(error)
+                    return [_bandcamp_error_result("🔴 Bandcamp not reachable")]
+            elif "network" in error_message or "dns" in error_message:
+                error = create_error(
+                    ErrorType.SITE_DOWN,
+                    platform,
+                    "Cannot reach Bandcamp website",
+                    url=url,
+                    original_error=str(e)
+                )
+            else:
+                error = create_error(
+                    ErrorType.BROWSER_ERROR,
+                    platform,
+                    f"Browser error accessing Bandcamp: {str(e)}",
+                    url=url,
+                    original_error=str(e)
+                )
+            
+            log_error(error)
+            return [_bandcamp_error_result("🔴 Bandcamp not reachable")]
         
         # AGGRESSIVE wait time for <4s target
         wait = WebDriverWait(driver, 2)              # 4s → 2s (-50%)
@@ -818,30 +1074,86 @@ def search_bandcamp(artist, track):
                 'search_time': 0.1
             }]
     
+    except ImportError:
+        # Test dummy for development when Selenium not available
+        time.sleep(0.1)
+        if artist.lower() in ["A", "a"] or track.lower() in ["A", "a"]:
+            return [{
+                'platform': 'Bandcamp',
+                'title': f'TEST: {track}',
+                'artist': f'TEST: {artist}',
+                'album': f'TEST Album',
+                'label': 'Independent',
+                'price': 'nyp',
+                'cover_url': 'https://via.placeholder.com/150x150/629AA0/FFFFFF?text=TEST',
+                'url': f'https://bandcamp.com/search?q={track.lower()}',
+                'search_time': 0.1
+            }]
+        return [_bandcamp_error_result("📭 Kein Treffer")]
+        
     except Exception as e:
-# Performance timing only
-        return [{
-            'platform': 'Bandcamp',
-            'title': '❌ Bandcamp Suche nicht verfügbar',
-            'artist': '',
-            'album': '',
-            'label': '',
-            'price': '',
-            'cover_url': '',
-            'url': '',
-            'search_time': 0.1
-        }]
+        elapsed_time = time.time() - start_time
+        error = create_error(
+            ErrorType.UNKNOWN_ERROR,
+            platform,
+            f"Unexpected error in Bandcamp scraper: {str(e)}",
+            elapsed_time=elapsed_time,
+            original_error=str(e)
+        )
+        log_error(error)
+        return [_bandcamp_error_result("❌ Bandcamp Suche nicht verfügbar")]
+
+def _bandcamp_error_result(message: str) -> dict:
+    """Helper function to create consistent Bandcamp error results"""
+    return {
+        'platform': 'Bandcamp',
+        'title': message,
+        'artist': '',
+        'album': '',
+        'label': '',
+        'price': '',
+        'cover_url': '',
+        'url': '',
+        'search_time': 0.0
+    }
 
 # --- TRAXSOURCE DUMMY ---
 def search_traxsource(artist, track):
-    """Traxsource scraper with test dummy and fallback error handling"""
+    """Traxsource scraper with comprehensive error handling"""
+    import time
+    platform = "Traxsource"
+    start_time = time.time()
+    
     try:
-        # Real Traxsource scraper implementation
-        from selenium import webdriver
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        import time
+        # Input validation
+        if not artist and not track:
+            error = create_error(
+                ErrorType.VALIDATION_ERROR,
+                platform,
+                "No search parameters provided",
+                artist=artist,
+                track=track
+            )
+            log_error(error)
+            return [_traxsource_error_result("❌ No search terms provided")]
+        
+        # Dependency check
+        try:
+            from selenium import webdriver
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            import time
+        except ImportError as e:
+            error = create_error(
+                ErrorType.DEPENDENCY_ERROR,
+                platform,
+                "Selenium dependencies not available",
+                package="selenium",
+                original_error=str(e)
+            )
+            log_error(error)
+            return [_traxsource_error_result("🔧 Browser automation not available")]
         
 # Performance timing only
         start_time = time.time()
@@ -862,13 +1174,72 @@ def search_traxsource(artist, track):
         options.add_argument('--disable-backgrounding-occluded-windows')
         options.add_argument('--window-size=1280,720')  # Smaller window for speed
         
-        driver = webdriver.Chrome(options=options)
+        try:
+            driver = webdriver.Chrome(options=options)
+        except Exception as e:
+            error = create_error(
+                ErrorType.BROWSER_ERROR,
+                platform,
+                "Failed to initialize Chrome WebDriver for Traxsource",
+                original_error=str(e)
+            )
+            log_error(error)
+            return [_traxsource_error_result("🌐 Browser initialization failed")]
         
-        # Aggressive timeouts for Traxsource (since IPv4 optimization not needed)
-        driver.implicitly_wait(2)
-        driver.set_page_load_timeout(6)  # Traxsource is slow, but 6s should be enough
-        
-        driver.get(url)
+        try:
+            # Aggressive timeouts for Traxsource (since IPv4 optimization not needed)
+            driver.implicitly_wait(2)
+            driver.set_page_load_timeout(6)  # Traxsource is slow, but 6s should be enough
+            
+            driver.get(url)
+            
+        except Exception as e:
+            try:
+                driver.quit()
+            except:
+                pass
+            
+            # Smart timeout handling for Traxsource  
+            error_message = str(e).lower()
+            if "timeout" in error_message:
+                # Try one quick retry with extended timeout (Traxsource is notoriously slow)
+                print(f"⚡ Traxsource: Quick retry with extended timeout...")
+                try:
+                    driver.set_page_load_timeout(8.0)  # Longer extension for Traxsource
+                    driver.get(url)
+                    print(f"✅ Traxsource: Retry successful!")
+                    # Continue with normal flow
+                except Exception as retry_error:
+                    error = create_error(
+                        ErrorType.SCRIPT_TIMEOUT,
+                        platform,
+                        f"Page load timeout for Traxsource after retry: {url}",
+                        timeout_duration=8.0,
+                        retry_attempted=True,
+                        url=url,
+                        original_error=str(retry_error)
+                    )
+                    log_error(error)
+                    return [_traxsource_error_result("🔴 Traxsource not reachable")]
+            elif "network" in error_message or "dns" in error_message:
+                error = create_error(
+                    ErrorType.SITE_DOWN,
+                    platform,
+                    "Cannot reach Traxsource website",
+                    url=url,
+                    original_error=str(e)
+                )
+            else:
+                error = create_error(
+                    ErrorType.BROWSER_ERROR,
+                    platform,
+                    f"Browser error accessing Traxsource: {str(e)}",
+                    url=url,
+                    original_error=str(e)
+                )
+            
+            log_error(error)
+            return [_traxsource_error_result("🔴 Traxsource not reachable")]
         
         # Reduced wait time since we're not getting IPv6 benefits
         wait = WebDriverWait(driver, 4)  # 10s → 4s
@@ -1036,30 +1407,86 @@ def search_traxsource(artist, track):
                 'search_time': 0.1
             }]
     
+    except ImportError:
+        # Test dummy for development when Selenium not available
+        time.sleep(0.1)
+        if artist.lower() in ["A", "a"] or track.lower() in ["A", "a"]:
+            return [{
+                'platform': 'Traxsource',
+                'title': f'TEST: {track}',
+                'artist': f'TEST: {artist}',
+                'album': f'TEST Album',
+                'label': 'Test House Label',
+                'price': '$2.99',
+                'cover_url': 'https://via.placeholder.com/150x150/FF6600/FFFFFF?text=TEST',
+                'url': f'https://traxsource.com/search?term={track.lower()}',
+                'search_time': 0.1
+            }]
+        return [_traxsource_error_result("📭 Kein Treffer")]
+        
     except Exception as e:
-# Performance timing only
-        return [{
-            'platform': 'Traxsource',
-            'title': '❌ Traxsource Suche nicht verfügbar',
-            'artist': '',
-            'album': '',
-            'label': '',
-            'price': '',
-            'cover_url': '',
-            'url': '',
-            'search_time': 0.1
-        }]
+        elapsed_time = time.time() - start_time
+        error = create_error(
+            ErrorType.UNKNOWN_ERROR,
+            platform,
+            f"Unexpected error in Traxsource scraper: {str(e)}",
+            elapsed_time=elapsed_time,
+            original_error=str(e)
+        )
+        log_error(error)
+        return [_traxsource_error_result("❌ Traxsource Suche nicht verfügbar")]
+
+def _traxsource_error_result(message: str) -> dict:
+    """Helper function to create consistent Traxsource error results"""
+    return {
+        'platform': 'Traxsource',
+        'title': message,
+        'artist': '',
+        'album': '',
+        'label': '',
+        'price': '',
+        'cover_url': '',
+        'url': '',
+        'search_time': 0.0
+    }
 
 # --- REVIBED DUMMY ---
 def search_revibed(artist, album):
-    """Revibed scraper with test dummy and fallback error handling"""
+    """Revibed scraper with comprehensive error handling"""
+    import time
+    platform = "Revibed"
+    start_time = time.time()
+    
     try:
-        # Real Revibed scraper implementation
-        from selenium import webdriver
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        import time
+        # Input validation - Revibed focuses on artist or album, not track
+        if not artist and not album:
+            error = create_error(
+                ErrorType.VALIDATION_ERROR,
+                platform,
+                "No search parameters provided - Revibed requires artist or album",
+                artist=artist,
+                album=album
+            )
+            log_error(error)
+            return [_revibed_error_result("❌ No search terms provided")]
+        
+        # Dependency check
+        try:
+            from selenium import webdriver
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            import time
+        except ImportError as e:
+            error = create_error(
+                ErrorType.DEPENDENCY_ERROR,
+                platform,
+                "Selenium dependencies not available",
+                package="selenium",
+                original_error=str(e)
+            )
+            log_error(error)
+            return [_revibed_error_result("🔧 Browser automation not available")]
         
 # Performance timing only
         start_time = time.time()
@@ -1073,18 +1500,16 @@ def search_revibed(artist, album):
             search_query = ""
         
         if not search_query:
-            return [{
-                'platform': 'Revibed',
-                'title': '',
-                'artist': '',
-                'album': '',
-                'label': '',
-                'price': '',
-                'cover_url': '',
-                'url': '',
-                'search_time': 0.1,
-                'message': "Für Revibed-Suche muss mindestens Album ODER Artist ausgefüllt sein."
-            }]
+            error = create_error(
+                ErrorType.VALIDATION_ERROR,
+                platform,
+                "Empty search query after processing",
+                artist=artist,
+                album=album,
+                processed_query=search_query
+            )
+            log_error(error)
+            return [_revibed_error_result("❌ Empty search query")]
         
         # FIXED URL structure for Revibed (corrected format)
         encoded_query = search_query.replace(' ', '+')
@@ -1124,17 +1549,77 @@ def search_revibed(artist, album):
             "profile.default_content_setting_values.popups": 2,
         })
         
-        driver = webdriver.Chrome(options=options)
-        setup_time = time.time() - start_time
-        print(f"DEBUG Revibed: Driver setup took {setup_time:.2f}s")
+        try:
+            driver = webdriver.Chrome(options=options)
+        except Exception as e:
+            error = create_error(
+                ErrorType.BROWSER_ERROR,
+                platform,
+                "Failed to initialize Chrome WebDriver for Revibed",
+                original_error=str(e)
+            )
+            log_error(error)
+            return [_revibed_error_result("🌐 Browser initialization failed")]
         
-        # ULTRA AGGRESSIVE TIMEOUTS for <4s target (Revibed specific)
-        driver.implicitly_wait(0.3)                  # 0.8s → 0.3s (ultra fast for elements)
-        driver.set_page_load_timeout(2.5)            # 3s → 2.5s 
-        
-        page_load_start = time.time()
-        driver.get(url)
-        page_load_time = time.time() - page_load_start
+        try:
+            setup_time = time.time() - start_time
+            print(f"DEBUG Revibed: Driver setup took {setup_time:.2f}s")
+            
+            # ULTRA AGGRESSIVE TIMEOUTS for <4s target (Revibed specific)
+            driver.implicitly_wait(0.3)                  # 0.8s → 0.3s (ultra fast for elements)
+            driver.set_page_load_timeout(2.5)            # 3s → 2.5s 
+            
+            page_load_start = time.time()
+            driver.get(url)
+            page_load_time = time.time() - page_load_start
+            
+        except Exception as e:
+            try:
+                driver.quit()
+            except:
+                pass
+            
+            # Smart timeout handling for Revibed
+            error_message = str(e).lower()
+            if "timeout" in error_message:
+                # Try one quick retry with extended timeout
+                print(f"⚡ Revibed: Quick retry with extended timeout...")
+                try:
+                    driver.set_page_load_timeout(4.5)  # Extension for Revibed
+                    driver.get(url)
+                    print(f"✅ Revibed: Retry successful!")
+                    # Continue with normal flow
+                except Exception as retry_error:
+                    error = create_error(
+                        ErrorType.SCRIPT_TIMEOUT,
+                        platform,
+                        f"Page load timeout for Revibed after retry: {url}",
+                        timeout_duration=4.5,
+                        retry_attempted=True,
+                        url=url,
+                        original_error=str(retry_error)
+                    )
+                    log_error(error)
+                    return [_revibed_error_result("🔴 Revibed not reachable")]
+            elif "network" in error_message or "dns" in error_message:
+                error = create_error(
+                    ErrorType.SITE_DOWN,
+                    platform,
+                    "Cannot reach Revibed website",
+                    url=url,
+                    original_error=str(e)
+                )
+            else:
+                error = create_error(
+                    ErrorType.BROWSER_ERROR,
+                    platform,
+                    f"Browser error accessing Revibed: {str(e)}",
+                    url=url,
+                    original_error=str(e)
+                )
+            
+            log_error(error)
+            return [_revibed_error_result("🔴 Revibed not reachable")]
         print(f"DEBUG Revibed: Page load took {page_load_time:.2f}s")
         
         wait = WebDriverWait(driver, 0.8)            # 1.5s → 0.8s (ultra fast)
@@ -1382,18 +1867,48 @@ def search_revibed(artist, album):
                 'search_time': 0.1
             }]
     
+    except ImportError:
+        # Test dummy for development when Selenium not available
+        time.sleep(0.1)
+        if artist and (artist.lower() in ["A", "a"] or album and album.lower() in ["A", "a"]):
+            return [{
+                'platform': 'Revibed',
+                'title': f'TEST: {album or "Test Album"}',
+                'artist': f'TEST: {artist or "Test Artist"}',
+                'album': f'TEST: {album or "Test Album"}',
+                'label': 'Test Vinyl Label',
+                'price': '€25.00',
+                'cover_url': 'https://via.placeholder.com/150x150/8B4513/FFFFFF?text=TEST',
+                'url': f'https://revibed.com/item/test-{(album or artist or "test").lower()}',
+                'search_time': 0.1
+            }]
+        return [_revibed_error_result("📭 Kein Treffer")]
+        
     except Exception as e:
-        return [{
-            'platform': 'Revibed',
-            'title': '❌ Revibed Suche nicht verfügbar',
-            'artist': '',
-            'album': '',
-            'label': '',
-            'price': '',
-            'cover_url': '',
-            'url': '',
-            'search_time': 0.1
-        }]
+        elapsed_time = time.time() - start_time
+        error = create_error(
+            ErrorType.UNKNOWN_ERROR,
+            platform,
+            f"Unexpected error in Revibed scraper: {str(e)}",
+            elapsed_time=elapsed_time,
+            original_error=str(e)
+        )
+        log_error(error)
+        return [_revibed_error_result("❌ Revibed Suche nicht verfügbar")]
+
+def _revibed_error_result(message: str) -> dict:
+    """Helper function to create consistent Revibed error results"""
+    return {
+        'platform': 'Revibed',
+        'title': message,
+        'artist': '',
+        'album': '',
+        'label': '',
+        'price': '',
+        'cover_url': '',
+        'url': '',
+        'search_time': 0.0
+    }
 
 # ----- True parallel wrapper function -----
 def search_digital_releases_parallel(artist, track, album, catno):
@@ -1429,9 +1944,11 @@ def search_digital_releases_parallel(artist, track, album, catno):
                 results.extend(result)
             except Exception as exc:
                 print(f"{platform_name} generated an exception: {exc}")
+                # Use structured error message instead of generic "Fehler"
+                error_title = f"🔧 {platform_name} Exception: {str(exc)[:50]}..."
                 results.append({
                     "platform": platform_name,
-                    "title": "Fehler / Kein Treffer", 
+                    "title": error_title, 
                     "artist": "",
                     "album": "",
                     "label": "",

@@ -20,6 +20,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import threading
 from functools import wraps
 import hashlib
+from error_types import ErrorType, create_error, log_error
 
 
 # Configuration class for easy maintenance
@@ -253,7 +254,7 @@ class DiscogsScraper:
     @rate_limit_decorator
     def scrape_marketplace_offers(self, release_id: str, max_offers: Optional[int] = None) -> Dict:
         """
-        Scrape marketplace offers for a Discogs release
+        Scrape marketplace offers for a Discogs release with comprehensive error handling
         
         Args:
             release_id: Discogs release ID
@@ -262,6 +263,19 @@ class DiscogsScraper:
         Returns:
             Dictionary with offers and metadata
         """
+        platform = "Discogs Scraper"
+        
+        # Input validation
+        if not release_id:
+            error = create_error(
+                ErrorType.VALIDATION_ERROR,
+                platform,
+                "No release ID provided for marketplace scraping",
+                release_id=release_id
+            )
+            log_error(error)
+            return self._error_result(release_id, "validation_error", "No release ID provided")
+        
         max_offers = max_offers or self.config.max_offers_per_release
         cache_key = self.get_cache_key(release_id=release_id, max_offers=max_offers)
         
@@ -279,12 +293,71 @@ class DiscogsScraper:
         
         driver = None
         try:
-            driver = self.create_driver()
+            try:
+                driver = self.create_driver()
+            except Exception as e:
+                error = create_error(
+                    ErrorType.BROWSER_ERROR,
+                    platform,
+                    f"Failed to create WebDriver for release {release_id}",
+                    release_id=release_id,
+                    original_error=str(e)
+                )
+                log_error(error)
+                return self._error_result(release_id, "browser_error", "Failed to initialize browser")
+            
             # Include user country for localized shipping calculations
             marketplace_url = f"https://www.discogs.com/sell/list?release_id={release_id}&ev=rb&country={self.config.user_country}"
             
             self.logger.info(f"Scraping offers for release {release_id}")
-            driver.get(marketplace_url)
+            
+            try:
+                driver.get(marketplace_url)
+            except Exception as e:
+                error_message = str(e).lower()
+                if "timeout" in error_message:
+                    # Smart timeout handling for Discogs - try one retry with extended timeout
+                    self.logger.info(f"⚡ Discogs: Quick retry with extended timeout for release {release_id}...")
+                    try:
+                        # Temporarily extend page load timeout
+                        driver.set_page_load_timeout(self.config.page_load_timeout + 10)  # +10s extension
+                        driver.get(marketplace_url)
+                        self.logger.info(f"✅ Discogs: Retry successful for release {release_id}!")
+                        # Continue with normal flow - don't return error
+                    except Exception as retry_error:
+                        error = create_error(
+                            ErrorType.SCRIPT_TIMEOUT,
+                            platform,
+                            f"Page load timeout for Discogs marketplace after retry: {marketplace_url}",
+                            release_id=release_id,
+                            url=marketplace_url,
+                            timeout_duration=self.config.page_load_timeout + 10,
+                            retry_attempted=True,
+                            original_error=str(retry_error)
+                        )
+                        log_error(error)
+                        return self._error_result(release_id, "site_access_error", "Cannot access Discogs marketplace after retry")
+                elif "network" in error_message or "dns" in error_message:
+                    error = create_error(
+                        ErrorType.SITE_DOWN,
+                        platform,
+                        f"Cannot reach Discogs marketplace for release {release_id}",
+                        release_id=release_id,
+                        url=marketplace_url,
+                        original_error=str(e)
+                    )
+                else:
+                    error = create_error(
+                        ErrorType.BROWSER_ERROR,
+                        platform,
+                        f"Browser error accessing Discogs marketplace: {str(e)}",
+                        release_id=release_id,
+                        url=marketplace_url,
+                        original_error=str(e)
+                    )
+                
+                log_error(error)
+                return self._error_result(release_id, "site_access_error", "Cannot access Discogs marketplace")
             
             # Wait for page to load and simulate human behavior
             time.sleep(random.uniform(2, 4))
@@ -317,6 +390,15 @@ class DiscogsScraper:
                     if offer_data:
                         offers.append(offer_data)
                 except Exception as e:
+                    error = create_error(
+                        ErrorType.PARSING_ERROR,
+                        platform,
+                        f"Failed to extract offer {i} data for release {release_id}",
+                        release_id=release_id,
+                        offer_index=i,
+                        original_error=str(e)
+                    )
+                    log_error(error)
                     self.logger.warning(f"Failed to extract offer {i}: {e}")
                     continue
             
@@ -333,30 +415,58 @@ class DiscogsScraper:
             
             return result
             
-        except TimeoutException:
+        except TimeoutException as e:
+            error = create_error(
+                ErrorType.SCRIPT_TIMEOUT,
+                platform,
+                f"Timeout while scraping marketplace offers for release {release_id}",
+                release_id=release_id,
+                timeout_duration=self.config.request_timeout,
+                original_error=str(e)
+            )
+            log_error(error)
             self.logger.error(f"Timeout scraping release {release_id}")
-            return {
-                'release_id': release_id,
-                'offers': [],
-                'total_offers': 0,
-                'scraped_at': time.time(),
-                'status': 'timeout_error'
-            }
+            return self._error_result(release_id, "timeout_error", "Scraping timeout")
+            
+        except NoSuchElementException as e:
+            error = create_error(
+                ErrorType.SELECTOR_NOT_FOUND,
+                platform,
+                f"Required elements not found for release {release_id} - page structure may have changed",
+                release_id=release_id,
+                original_error=str(e)
+            )
+            log_error(error)
+            self.logger.error(f"Element not found scraping release {release_id}: {e}")
+            return self._error_result(release_id, "structure_changed", "Page structure changed")
+            
         except Exception as e:
+            error = create_error(
+                ErrorType.UNKNOWN_ERROR,
+                platform,
+                f"Unexpected error scraping marketplace offers for release {release_id}: {str(e)}",
+                release_id=release_id,
+                original_error=str(e)
+            )
+            log_error(error)
             self.logger.error(f"Error scraping release {release_id}: {e}")
-            return {
-                'release_id': release_id,
-                'offers': [],
-                'total_offers': 0,
-                'scraped_at': time.time(),
-                'status': 'scraping_error',
-                'error': str(e)
-            }
+            return self._error_result(release_id, "scraping_error", str(e))
         finally:
             if driver:
                 driver.quit()
             with self.session_lock:
                 self.active_sessions -= 1
+                
+    def _error_result(self, release_id: str, status: str, error_message: str) -> Dict:
+        """Helper method to create consistent error results"""
+        return {
+            'release_id': release_id,
+            'offers': [],
+            'total_offers': 0,
+            'scraped_at': time.time(),
+            'status': status,
+            'error': error_message
+        }
     
     def extract_offer_data(self, driver, offer_element) -> Optional[Dict]:
         """Extract offer data from a single offer element"""

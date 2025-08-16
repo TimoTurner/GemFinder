@@ -28,11 +28,27 @@ def show_live_results():
         platform = result.get("platform", "Unknown")
         title = result.get("title", "")
         
-        # Check if this is a real result or error
-        if title.lower() in ["kein treffer", "fehler", "", "❌ fehler"]:
-            platform_status[platform] = "❌"
-        elif "nicht verfügbar" in title.lower():
-            platform_status[platform] = "⚠️"
+        # Check if this is a real result or error - updated for new error handling
+        # Old error patterns
+        old_error_patterns = ["kein treffer", "fehler", "", "❌ fehler"]
+        # New structured error patterns from error handling system
+        new_error_patterns = [
+            "❌", "🔴", "🔧", "📭", "🚫", "🐌", "⚡", "🔒", 
+            "not reachable", "nicht verfügbar", "not available",
+            "initialization failed", "browser error", "timeout",
+            "no search terms", "keine suchbegriffe"
+        ]
+        
+        is_error = (
+            title.lower() in old_error_patterns or 
+            any(pattern in title.lower() for pattern in new_error_patterns)
+        )
+        
+        if is_error:
+            if "nicht verfügbar" in title.lower() or "not available" in title.lower():
+                platform_status[platform] = "⚠️"
+            else:
+                platform_status[platform] = "❌"
         else:
             platform_status[platform] = "✅"
     
@@ -138,11 +154,28 @@ def show_live_results():
         if "live_progress_container" in st.session_state:
             st.session_state.live_progress_container.empty()
         
-        # Check if there are real hits
-        real_hits = [
-            r for r in st.session_state.get("live_results", [])
-            if (r.get("title") or "").strip().lower() not in ("kein treffer", "", "fehler")
-        ]
+        # Check if there are real hits - updated to recognize new error handling messages
+        real_hits = []
+        for r in st.session_state.get("live_results", []):
+            title = (r.get("title") or "").strip().lower()
+            # Old error patterns
+            old_patterns = ("kein treffer", "", "fehler")
+            # New structured error patterns from error handling system
+            new_error_patterns = (
+                "❌", "🔴", "🔧", "📭", "🚫", "🐌", "⚡", "🔒", 
+                "not reachable", "nicht verfügbar", "not available",
+                "initialization failed", "browser error", "timeout",
+                "no search terms", "keine suchbegriffe"
+            )
+            
+            # Check if this is a real hit (not an error message)
+            is_error = (
+                title in old_patterns or 
+                any(pattern in title for pattern in new_error_patterns)
+            )
+            
+            if not is_error:
+                real_hits.append(r)
         
         # Button logic moved to main.py to avoid state issues
         # Just store that we have hits for main.py to use
@@ -233,14 +266,28 @@ def check_offer_shipping_availability(offer_url, user_country):
 
 # --- Unified Hit Detection Logic ---
 def is_valid_result(entry, check_empty_title=True):
-    """Unified function to check if a result is valid (not a 'no hit' response)"""
+    """Unified function to check if a result is valid (not a 'no hit' response) - updated for new error handling"""
     title = (entry.get("title") or "").strip().lower()
-    invalid_titles = ["kein treffer", "fehler / kein treffer", "", "nicht gesucht (angaben fehlen)", "fehler"]
+    
+    # Old error patterns
+    old_invalid_titles = ["kein treffer", "fehler / kein treffer", "", "nicht gesucht (angaben fehlen)", "fehler"]
+    # New structured error patterns from error handling system
+    new_error_patterns = [
+        "❌", "🔴", "🔧", "📭", "🚫", "🐌", "⚡", "🔒", 
+        "not reachable", "nicht verfügbar", "not available",
+        "initialization failed", "browser error", "timeout",
+        "no search terms", "keine suchbegriffe"
+    ]
+    
+    is_invalid = (
+        title in old_invalid_titles or 
+        any(pattern in title for pattern in new_error_patterns)
+    )
     
     if check_empty_title:
-        return title and title not in invalid_titles
+        return title and not is_invalid
     else:
-        return title not in invalid_titles
+        return not is_invalid
 
 def get_user_location():
     """Get user location via IP for currency zone detection"""

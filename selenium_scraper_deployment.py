@@ -78,8 +78,16 @@ def create_selenium_driver(headless: bool = True, aggressive: bool = True) -> we
     try:
         import os
         # Check if we're running on Streamlit Cloud (Linux environment)
-        if os.path.exists('/usr/bin/chromium-browser'):
-            options.binary_location = '/usr/bin/chromium-browser'
+        if os.path.exists('/usr/bin/chromium'):
+            options.binary_location = '/usr/bin/chromium'
+        elif os.path.exists('/usr/bin/firefox-esr'):
+            # Fallback to Firefox if Chromium not available
+            from selenium.webdriver.firefox.options import Options as FirefoxOptions
+            from selenium import webdriver as firefox_webdriver
+            firefox_options = FirefoxOptions()
+            firefox_options.add_argument('--headless')
+            driver = firefox_webdriver.Firefox(options=firefox_options)
+            return driver
             
         driver = webdriver.Chrome(options=options)
     except Exception as e:

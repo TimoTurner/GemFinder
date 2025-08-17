@@ -32,7 +32,7 @@ except ImportError:
     SELENIUM_AVAILABLE = False
     print("Selenium not available - falling back to basic filtering")
 
-def create_selenium_driver(headless: bool = True, aggressive: bool = True) -> webdriver.Chrome:
+def create_selenium_driver(headless: bool = True, aggressive: bool = True):
     """Create optimized Chrome driver for fast Discogs scraping"""
     options = Options()
     
@@ -82,12 +82,22 @@ def create_selenium_driver(headless: bool = True, aggressive: bool = True) -> we
             options.binary_location = '/usr/bin/chromium'
         elif os.path.exists('/usr/bin/firefox-esr'):
             # Fallback to Firefox if Chromium not available
+            print("Using Firefox ESR for Selenium")
             from selenium.webdriver.firefox.options import Options as FirefoxOptions
             from selenium import webdriver as firefox_webdriver
             firefox_options = FirefoxOptions()
             firefox_options.add_argument('--headless')
-            driver = firefox_webdriver.Firefox(options=firefox_options)
-            return driver
+            firefox_options.add_argument('--no-sandbox')
+            firefox_options.add_argument('--disable-dev-shm-usage')
+            firefox_options.add_argument('--disable-gpu')
+            
+            try:
+                driver = firefox_webdriver.Firefox(options=firefox_options)
+                print("Firefox driver created successfully")
+                return driver
+            except Exception as firefox_error:
+                print(f"Firefox driver failed: {firefox_error}")
+                raise firefox_error
             
         driver = webdriver.Chrome(options=options)
     except Exception as e:

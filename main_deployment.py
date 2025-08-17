@@ -757,8 +757,12 @@ elif mode == "Take a picture":
     
     # Camera and retake logic
     if not st.session_state.get("last_processed_camera"):
-        # Show camera input for first photo
-        camera_photo = st.camera_input("📸 Take a photo")
+        # Show camera input for first photo (may not work in Streamlit Cloud)
+        try:
+            camera_photo = st.camera_input("📸 Take a photo")
+        except Exception as e:
+            st.error("📱 Camera not available in cloud environment. Please use 'Upload photo' mode instead.")
+            camera_photo = None
     else:
         # Photo already taken - show retake button
         camera_photo = None

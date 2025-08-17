@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# API Keys und Secrets
+*.key
+.env.local
+.env.production
+
+# Logs
+*.log
+logs/
+streamlit.log
+discogs_scraper.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Selenium
+chromedriver
+geckodriver
+*.crx
+
+# Test files
+test_*.html
+*_test.html
+debug_*.py
+
+# Cache
+.pytest_cache/
+.coverage
+
+# Deployment copies (keep in repo for Streamlit Cloud)
+# *_deployment.py

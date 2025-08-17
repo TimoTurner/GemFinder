@@ -26,11 +26,16 @@ try:
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.firefox.options import Options as FirefoxOptions
     from selenium.common.exceptions import TimeoutException, NoSuchElementException
     SELENIUM_AVAILABLE = True
 except ImportError:
     SELENIUM_AVAILABLE = False
     print("Selenium not available - falling back to basic filtering")
+
+# Cloud environment detection
+import os
+IS_STREAMLIT_CLOUD = os.path.exists('/mount/src') or os.environ.get('STREAMLIT_CLOUD', False)
 
 def create_selenium_driver(headless: bool = True, aggressive: bool = True):
     """Create optimized Chrome driver for fast Discogs scraping"""

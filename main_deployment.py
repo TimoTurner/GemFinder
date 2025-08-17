@@ -11,7 +11,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # --- Deine Modul-Imports ---
-from providers import (
+from providers_deployment import (
     SearchManager,
     DiscogsProvider, RevibedProvider,
     ItunesProvider, BeatportProvider, BandcampProvider, TraxsourceProvider
@@ -23,8 +23,9 @@ from ui_helpers_deployment import (
 )
 from utils import get_platform_info, is_fuzzy_match
 
-# Import deployment version of selenium scraper for Streamlit Cloud
+# Import deployment versions for Streamlit Cloud compatibility
 import selenium_scraper_deployment as selenium_scraper
+import scrape_search_deployment as scrape_search
 
 from state_manager import AppState
 
